@@ -1,4 +1,6 @@
-import math, sys
+import math, sys, functools
+
+from queue import PriorityQueue
 
 
 
@@ -26,10 +28,13 @@ class Game:
 
 		self.me = Player(self)
 		self.me.init_me()
-
 		self.opponent = Player(self)
 
 		self.heroes_per_player = int(input())
+
+		self.monsters = Monsters(self)
+		self.my_heroes = MyHeroes(self)
+		self.opponent_heroes = OpponentHeroes(self)
 
 		self.entities = Entities(self)
 
@@ -45,15 +50,14 @@ class Game:
 		self.me.parse_health_and_mana()
 		self.opponent.parse_health_and_mana()
 
-		self.entities.my_heroes = MyHeroes(self.entities)
-
 
 	def update(self):
+		self.my_heroes.update()
 		self.entities.update()
 
 
 
-class Player(Game):
+class Player:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
 
@@ -67,7 +71,104 @@ class Player(Game):
 
 
 
-class Entities(Game):
+class Monsters:
+	def __init__(self, parent_game):
+		self.parent_game = parent_game
+
+		self.monsters = []
+
+
+	def add_monster(self, entity):
+		self.monsters.append(
+			Monster(self, entity)
+		)
+
+
+
+class MyHeroes:
+	def __init__(self, parent_game):
+		self.parent_game = parent_game
+
+		self.my_heroes = []
+
+		self.possible_actions = PriorityQueue()
+
+
+	def add_my_next_hero(self, entity):
+		my_heroes_len = len(self.my_heroes)
+
+		if my_heroes_len == 0:
+			self.my_heroes.append(
+				HeroFarmer(
+					self,
+					entity,
+					Point(
+						3000,
+						5300
+					)
+				)
+			)
+		elif my_heroes_len == 1:
+			self.my_heroes.append(
+				HeroFarmer(
+					self,
+					entity,
+					Point(
+						5300,
+						3000
+					)
+				)
+			)
+		else:
+			self.my_heroes.append(
+				HeroAttacker(
+					self,
+					entity,
+					Point(
+						13000,
+						5000
+					)
+				)
+			)
+
+
+	def update(self):
+		for my_hero in self.my_heroes:
+			my_hero.add_possible_actions()
+
+		while self.a_hero_has_no_action_assigned():
+			_, hero, action_with_arguments = self.possible_actions.get()
+
+			if not hero.action_with_arguments:
+				hero.action_with_arguments = action_with_arguments
+
+		for my_hero in self.my_heroes:
+			my_hero.action_with_arguments()
+
+
+	def a_hero_has_no_action_assigned(self):
+		return any(my_hero.action_with_arguments == None for my_hero in self.my_heroes)
+
+
+
+class OpponentHeroes:
+	def __init__(self, parent_game):
+		self.parent_game = parent_game
+
+		self.opponent_heroes = []
+
+
+	def get_opponent_hero(self, entity):
+		self.opponent_heroes.append(
+			OpponentHero(
+				self,
+				entity
+			)
+		)
+
+
+
+class Entities:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
 
@@ -75,20 +176,13 @@ class Entities(Game):
 		self.my_hero_type = 1
 		self.opponent_hero_type = 2
 
-		self.my_heroes = MyHeroes(self)
-
 
 	def update(self):
 		self.parse_entities()
-		# self.sort_entities()
-		self.my_heroes.update()
 
 
 	def parse_entities(self):
 		self.entity_count = int(input())
-
-		self.monsters = []
-		self.opponent_heroes = []
 
 		for _ in range(self.entity_count):
 			entity = Entity(self)
@@ -97,126 +191,16 @@ class Entities(Game):
 
 
 	def add_entity(self, entity):
-		entities_sublist = self.get_entities_sublist(entity)
-
-		instantiated_entity = self.get_instantiated_entity(entity)
-
-		entities_sublist.append(instantiated_entity)
-
-
-	def get_entities_sublist(self, entity):
 		if entity.type_ == self.monster_type:
-			return self.monsters
+			return self.parent_game.monsters.add_monster(entity)
 		elif entity.type_ == self.my_hero_type:
-			return self.my_heroes.heroes
-		return self.opponent_heroes
-
-
-	def get_instantiated_entity(self, entity):
-		if entity.type_ == self.monster_type:
-			return Monster(self, entity)
-		elif entity.type_ == self.my_hero_type:
-			return self.my_heroes.get_next_hero(entity)
-		return HeroBase(self, entity)
-
-
-	# def sort_entities(self):
-	# 	self.monsters.sort()
-	# 	self.opponent_heroes.sort()
-	# 	self.my_heroes.heroes.sort()
+			return self.parent_game.my_heroes.add_my_next_hero(entity)
+		elif entity.type_ == self.opponent_hero_type:
+			return self.parent_game.opponent_heroes.add_opponent_hero(entity)
 
 
 
-class MyHeroes(Entities):
-	def __init__(self, parent_entities):
-		self.parent_entities = parent_entities
-
-		self.heroes = []
-
-
-	def get_next_hero(self, entity):
-		my_heroes_len = len(self.heroes)
-
-		if my_heroes_len == 0:
-			return HeroFarmer(
-				self,
-				entity,
-				Point(
-					3000,
-					5300
-				),
-				1000
-		)
-		elif my_heroes_len == 1:
-			return HeroFarmer(
-				self,
-				entity,
-				Point(
-					5300,
-					3000
-				),
-				200
-		)
-		return HeroAttacker(self, entity, Point(
-			13000,
-			5000
-		))
-
-
-	def update(self):
-		self.assign_heroes()
-
-		for hero in self.heroes:
-			hero.update()
-
-
-	def assign_heroes(self):
-		for hero in self.heroes:
-			self.speculatively_assign_hero(
-				hero,
-				lambda unsorted_monster:
-					unsorted_monster.distance_from_my_base +
-					self.hero_distance_to_monster(hero, unsorted_monster)
-			)
-
-		for hero in self.heroes:
-			if hero.hero_base.target:
-				# TODO: Reuse lambda above and penalize enemies that are targeted by many heroes.
-				self.optimally_reassign_hero(hero)
-
-
-	def hero_distance_to_monster(self, hero, monster):
-		return math.dist(
-			(
-				hero.hero_base.entity.x,
-				hero.hero_base.entity.y
-			),
-			(
-				monster.entity.x,
-				monster.entity.y
-			)
-		)
-
-
-	def speculatively_assign_hero(self, hero, lambda_):
-		for monster in sorted(self.parent_entities.monsters, key=lambda_):
-			if monster.entity.threat_for == monster.threat_for_my_base:
-				hero.hero_base.target = monster
-				monster.targeted_by.append(hero)
-				return
-
-
-	def optimally_reassign_hero(self, hero):
-		# for targeted_by in hero.hero_base.target.targeted_by:
-		# 	if targeted_by is not hero:
-		# 		if self.hero_distance_to_monster(targeted_by, hero.hero_base.target) < self.hero_distance_to_monster(hero, hero.hero_base.target):
-		# 			hero.hero_base.target = None # TODO: Assign to second-best target.
-		# 			return
-		pass
-
-
-
-class Entity(Entities):
+class Entity:
 	def __init__(self, parent_entities):
 		self.parent_entities = parent_entities
 
@@ -253,7 +237,7 @@ class Entity(Entities):
 
 
 
-class Monster(Entities):
+class Monster:
 	def __init__(self, parent_entities, entity):
 		self.parent_entities = parent_entities
 
@@ -279,57 +263,154 @@ class Monster(Entities):
 
 
 
-class HeroBase(Entities):
-	def __init__(self, parent_entities, entity, rendezvous=None):
-		self.parent_entities = parent_entities
+class HeroBase:
+	def __init__(self, parent_hero, entity):
+		self.parent_hero = parent_hero
 
 		self.entity = entity
 
-		self.rendezvous = rendezvous
-
-		self.target = None
+		self.action_with_arguments = None
 
 
-	def update(self):
-		self.move()
+	def add_possible_actions(self):
+		self.add_wait()
+		self.add_move_to_all_targets()
 
 
-	def move(self):
-		if self.rendezvous is not None: # Prevents yellow lines under .x and .y
-			self.print_move(self.rendezvous.x, self.rendezvous.y)
+	def add_wait(self):
+		self.add_possible_action(
+			1337, # TODO: Does math.inf work?
+			functools.partial(self.action_wait)
+		)
 
 
-	def print_move(self, x, y):
-		print(f"MOVE {x} {y} {':)' if self.target != None else ''}")
+	# TODO: Change this method it predicts where the monster will be, instead of the current beelining.
+	def action_wait(self):
+		self.print_wait()
+
+
+	def print_wait(self, message=""):
+		print(f"WAIT {message}")
+
+
+	def add_possible_action(self, weight, action_with_arguments):
+		self.parent_hero.parent_my_heroes.possible_actions.put((weight, action_with_arguments))
+
+
+	def add_move_to_all_targets(self):
+		for monster in self.parent_hero.parent_game.monsters.monsters:
+			self.add_possible_action(
+				self.get_weight_action_move_to_monster(monster),
+				functools.partial(self.action_move_to_monster, monster)
+			)
+
+
+	# TODO: Change this method once the heroes don't beeline the monster anymore.
+	def get_weight_action_move_to_monster(self, monster):
+		return math.dist(
+			(self.entity.x, self.entity.y),
+			(monster.entity.x, monster.entity.y)
+		)
+
+
+	# TODO: Change this method it predicts where the monster will be, instead of the current beelining.
+	def action_move_to_monster(self, monster):
+		self.print_move(monster.entity.x, monster.entity.y)
+
+
+	def print_move(self, x, y, message=""):
+		print(f"MOVE {x} {y} {message}")
+
+
+	# def get_hero_distance_to_monster(self, hero, monster):
+
+
+	# def assign_heroes(self):
+	# 	for my_hero in self.my_heroes:
+	# 		self.speculatively_assign_hero(
+	# 			my_hero,
+	# 			lambda unsorted_monster:
+	# 				unsorted_monster.distance_from_my_base +
+	# 				self.get_hero_distance_to_monster(my_hero, unsorted_monster)
+	# 		)
+
+	# 	for my_hero in self.my_heroes:
+	# 		if my_hero.hero_base.target:
+	# 			# TODO: Reuse lambda above and penalize enemies that are targeted by many of my heroes.
+	# 			self.optimally_reassign_hero(my_hero)
+
+
+	# def speculatively_assign_hero(self, my_hero, lambda_):
+	# 	for monster in sorted(self.parent_entities.monsters, key=lambda_):
+	# 		if monster.entity.threat_for == monster.threat_for_my_base:
+	# 			my_hero.hero_base.target = monster
+	# 			monster.targeted_by.append(my_hero)
+	# 			return
+
+
+	# def optimally_reassign_hero(self, my_hero):
+	# 	# for targeted_by in my_hero.hero_base.target.targeted_by:
+	# 	# 	if targeted_by is not my_hero:
+	# 	# 		if self.get_hero_distance_to_monster(targeted_by, my_hero.hero_base.target) < self.get_hero_distance_to_monster(my_hero, my_hero.hero_base.target):
+	# 	# 			my_hero.hero_base.target = None # TODO: Assign to second-best target.
+	# 	# 			return
+	# 	pass
+
+
+	# 	if self.rendezvous is not None: # Prevents yellow lines under .x and .y
+	# 		self.print_move(self.rendezvous.x, self.rendezvous.y)
 
 
 
 class HeroFarmer(HeroBase):
-	def __init__(self, parent_entities, entity, rendezvous, maximum_distance_from_rendezvous):
-		self.parent_entities = parent_entities
+	def __init__(self, parent_my_heroes, entity, rendezvous):
+		self.parent_my_heroes = parent_my_heroes
 
-		self.hero_base = HeroBase(parent_entities, entity, rendezvous)
+		self.hero_base = HeroBase(self, entity)
+
+		self.rendezvous = rendezvous
 
 
-	def move(self):
-		if self.hero_base.target is not None:
-			# TODO: Lead the enemy, like how
-			self.hero_base.print_move(self.hero_base.target.entity.x, self.hero_base.target.entity.y)
-		else:
-			self.hero_base.move()
+	def add_possible_actions(self):
+		self.hero_base.add_possible_actions()
+
+		# self.parent_my_heroes.add_possible_action(
+		# 	Action()
+		# )
+
+
+	# def move(self):
+	# 	if self.hero_base.target is not None:
+	# 		# TODO: Lead the monster
+	# 		self.hero_base.print_move(self.hero_base.target.entity.x, self.hero_base.target.entity.y)
+	# 	else:
+	# 		self.hero_base.move()
 
 
 
 class HeroAttacker(HeroBase):
-	def __init__(self, parent_entities, entity, rendezvous):
-		self.parent_entities = parent_entities
+	def __init__(self, parent_my_heroes, entity, rendezvous):
+		self.parent_my_heroes = parent_my_heroes
 
-		self.hero_base = HeroBase(parent_entities, entity, rendezvous)
+		self.hero_base = HeroBase(self, entity)
+
+		self.rendezvous = rendezvous
 
 
-	def move(self):
-		self.hero_base.move()
+	def add_possible_actions(self):
+		self.hero_base.add_possible_actions()
 
+
+	# def move(self):
+	# 	self.hero_base.move()
+
+
+
+class OpponentHero:
+	def __init__(self, parent_opponent_heroes, entity):
+		self.parent_opponent_heroes = parent_opponent_heroes
+
+		self.entity = entity
 
 
 if __name__ == "__main__":
