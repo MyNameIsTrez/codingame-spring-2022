@@ -298,116 +298,7 @@ class Monster:
 
 
 
-class ActionWait:
-	def __init__(self, parent_hero_base):
-		self.parent_hero_base = parent_hero_base
-
-		self.add_wait()
-
-
-	def add_wait(self):
-		self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionWait.action_wait, "wait", self.get_weight_action_wait))
-
-
-	def action_wait(self, action_info):
-		self.wait(action_info)
-
-
-	def wait(self, action_info):
-		self.print_wait(action_info)
-
-
-	def print_wait(self, action_info):
-		print(f"WAIT {action_info['label']} {action_info['weight']}")
-
-
-	def get_weight_action_wait(self, action, action_arguments):
-		return Utils.infinite
-
-
-
-class ActionMoveToAllMonsters:
-	def __init__(self, parent_hero_base):
-		self.parent_hero_base = parent_hero_base
-
-		self.add_move_to_all_monsters()
-
-
-	def add_move_to_all_monsters(self):
-		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToAllMonsters.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
-
-
-	def action_move_to_monster(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	def get_weight_action_move_to_monster(self, action, action_arguments):
-		return (
-			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
-			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) * 5 +
-			self.get_weight_hero_distance_to_my_base() * 5
-		)
-
-
-	def get_weight_hero_distance_to_my_base(self):
-		my_base = self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.me
-		return math.dist(
-			(self.parent_hero_base.entity.x, self.parent_hero_base.entity.y),
-			(my_base.x, my_base.y)
-		)
-
-
-
-class ActionMoveToMonstersCloseToMyBase:
-	def __init__(self, parent_hero_base):
-		self.parent_hero_base = parent_hero_base
-
-		self.add_move_to_monsters_close_to_my_base()
-
-
-	def add_move_to_monsters_close_to_my_base(self):
-		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
-
-
-	def action_move_to_monster_close_to_my_base(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
-		return (
-			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
-			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) +
-			self.parent_hero_base.get_weight_threat_for_my_base(*action_arguments) +
-			self.get_weight_monster_distance_to_base(*action_arguments)
-		)
-
-
-	def get_weight_monster_distance_to_base(self, monster):
-		return monster.distance_from_my_base
-
-
-
-class HeroBase(ActionWait, ActionMoveToAllMonsters):
-	def __init__(self, parent_hero, entity):
-		self.parent_hero = parent_hero
-
-		self.entity = entity
-
-		self.action_info = None
-
-		self.penalty_weight = 1000
-
-		self.wind_range = 1280
-
-
-	def add_possible_actions(self):
-		ActionWait(self)
-		ActionMoveToAllMonsters(self)
-		ActionMoveToMonstersCloseToMyBase(self)
-
-
+class ActionBase:
 	def get_action_info(self, action, label, weight_method, *action_arguments):
 		return {
 			"action": action,
@@ -477,7 +368,118 @@ class HeroBase(ActionWait, ActionMoveToAllMonsters):
 
 
 
-class ActionBlowAwayFromBase:
+class ActionWait(ActionBase):
+	def __init__(self, parent_hero_base):
+		self.parent_hero_base = parent_hero_base
+
+		self.add_wait()
+
+
+	def add_wait(self):
+		self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionWait.action_wait, "wait", self.get_weight_action_wait))
+
+
+	def action_wait(self, action_info):
+		self.wait(action_info)
+
+
+	def wait(self, action_info):
+		self.print_wait(action_info)
+
+
+	def print_wait(self, action_info):
+		print(f"WAIT {action_info['label']} {action_info['weight']}")
+
+
+	def get_weight_action_wait(self, action, action_arguments):
+		return Utils.infinite
+
+
+
+class ActionMoveToAllMonsters(ActionBase):
+	def __init__(self, parent_hero_base):
+		self.parent_hero_base = parent_hero_base
+
+		self.add_move_to_all_monsters()
+
+
+	def add_move_to_all_monsters(self):
+		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
+			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToAllMonsters.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
+
+
+	def action_move_to_monster(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	def get_weight_action_move_to_monster(self, action, action_arguments):
+		return (
+			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) * 5 +
+			self.get_weight_hero_distance_to_my_base() * 5
+		)
+
+
+	def get_weight_hero_distance_to_my_base(self):
+		my_base = self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.me
+		return math.dist(
+			(self.parent_hero_base.entity.x, self.parent_hero_base.entity.y),
+			(my_base.x, my_base.y)
+		)
+
+
+
+class ActionMoveToMonstersCloseToMyBase(ActionBase):
+	def __init__(self, parent_hero_base):
+		self.parent_hero_base = parent_hero_base
+
+		self.add_move_to_monsters_close_to_my_base()
+
+
+	def add_move_to_monsters_close_to_my_base(self):
+		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
+			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
+
+
+	def action_move_to_monster_close_to_my_base(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
+		return (
+			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) +
+			self.parent_hero_base.get_weight_threat_for_my_base(*action_arguments) +
+			self.get_weight_monster_distance_to_base(*action_arguments)
+		)
+
+
+	def get_weight_monster_distance_to_base(self, monster):
+		return monster.distance_from_my_base
+
+
+
+class HeroBase(ActionWait, ActionMoveToAllMonsters, ActionMoveToMonstersCloseToMyBase):
+	def __init__(self, parent_hero, entity):
+		self.parent_hero = parent_hero
+
+		self.entity = entity
+
+		self.action_info = None
+
+		self.penalty_weight = 1000
+
+		self.wind_range = 1280
+
+
+	def add_possible_actions(self):
+		ActionWait(self)
+		ActionMoveToAllMonsters(self)
+		ActionMoveToMonstersCloseToMyBase(self)
+
+
+
+class ActionBlowAwayFromBase(ActionBase):
 	def __init__(self, parent_hero_farmer):
 		self.parent_hero_farmer = parent_hero_farmer
 
