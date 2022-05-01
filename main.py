@@ -144,29 +144,29 @@ class MyHeroes:
 		while self.a_hero_has_no_action_assigned():
 			self.recalculate_possible_actions()
 
-			_, _, hero, action_with_arguments = self.possible_actions.get()
+			_, _, hero, action_info = self.possible_actions.get()
 
-			if not hero.hero_base.action_with_arguments:
-				hero.hero_base.action_with_arguments = action_with_arguments
+			if not hero.hero_base.action_info:
+				hero.hero_base.action_info = action_info
 
 		self.run_hero_actions()
 
 
 	def a_hero_has_no_action_assigned(self):
-		return any(my_hero.hero_base.action_with_arguments == None for my_hero in self.my_heroes)
+		return any(my_hero.hero_base.action_info == None for my_hero in self.my_heroes)
 
 
 	def recalculate_possible_actions(self):
 		self.possible_actions = PriorityQueue()
 
 		for my_hero in self.my_heroes:
-			if not my_hero.hero_base.action_with_arguments:
+			if not my_hero.hero_base.action_info:
 				my_hero.add_possible_actions()
 
 
 	def run_hero_actions(self):
 		for my_hero in self.my_heroes:
-			my_hero.hero_base.action_with_arguments["action"](my_hero, my_hero.hero_base.action_with_arguments["label"], *my_hero.hero_base.action_with_arguments["action_arguments"])
+			my_hero.hero_base.action_info["action"](my_hero, my_hero.hero_base.action_info["label"], *my_hero.hero_base.action_info["action_arguments"])
 
 
 
@@ -284,7 +284,7 @@ class HeroBase:
 
 		self.entity = entity
 
-		self.action_with_arguments = None
+		self.action_info = None
 
 
 	def add_possible_actions(self):
@@ -295,22 +295,9 @@ class HeroBase:
 
 	def add_wait(self):
 		self.add_possible_action(
-			self.get_weight_action_wait,
 			self.action_wait,
-			self.get_action_with_arguments(HeroBase.action_wait, "wait")
+			self.get_action_info(HeroBase.action_wait, "wait", self.get_weight_action_wait)
 		)
-
-
-	def get_weight_action_wait(self, action_arguments, action_with_arguments):
-		return 4242 # TODO: Does math.inf work?
-
-
-	def get_action_with_arguments(self, action, label, *action_arguments):
-		return {
-			"action": action,
-			"label": label,
-			"action_arguments": action_arguments
-		}
 
 
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
@@ -322,27 +309,39 @@ class HeroBase:
 		print(f"WAIT {label}")
 
 
-	def add_possible_action(self, weight_method, action_method, action_with_arguments):
+	def get_weight_action_wait(self, action, action_arguments):
+		return 4242 # TODO: Does math.inf work?
+
+
+	def get_action_info(self, action, label, weight_method, *action_arguments):
+		return {
+			"action": action,
+			"label": label,
+			"weight": weight_method(action, action_arguments),
+			"action_arguments": action_arguments
+		}
+
+
+	def add_possible_action(self, action_method, action_info):
 		self.parent_hero.parent_my_heroes.possible_actions.put((
-			weight_method(action_with_arguments["action_arguments"], action_with_arguments),
+			action_info["weight"],
 			action_method.__repr__(), # This resolves equal weight collisions by essentially picking a random action.
 			self.parent_hero,
-			action_with_arguments
+			action_info
 		))
 
 
 	def add_move_to_all_monsters(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
 			self.add_possible_action(
-				self.get_weight_action_move_to_monster,
 				self.action_move_to_monster,
-				self.get_action_with_arguments(HeroBase.action_move_to_monster, "closest", monster)
+				self.get_action_info(HeroBase.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster)
 			)
 
 
-	def get_weight_action_move_to_monster(self, action_arguments, action_with_arguments):
+	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(500, action_with_arguments) +
+			self.get_locked_penalty_weight(500, action, action_arguments) +
 			self.get_weight_action_move_to_monster_raw(*action_arguments) * 10
 		)
 
@@ -355,17 +354,25 @@ class HeroBase:
 		)
 
 
-	def get_locked_penalty_weight(self, penalty_weight, action_with_arguments):
+	def get_locked_penalty_weight(self, penalty_weight, action, action_arguments):
 		total_penalty_weight = 0
 
 		for other_my_hero in self.parent_hero.parent_my_heroes.my_heroes:
 			if other_my_hero == self.parent_hero:
 				continue
 
-			if other_my_hero.hero_base.action_with_arguments == action_with_arguments:
+			if self.action_already_locked(other_my_hero, action, action_arguments):
 				total_penalty_weight += penalty_weight
 
 		return total_penalty_weight
+
+
+	def action_already_locked(self, other_my_hero, action, action_arguments):
+		return (
+			other_my_hero.hero_base.action_info and
+			other_my_hero.hero_base.action_info["action"] == action and
+			other_my_hero.hero_base.action_info["action_arguments"] == action_arguments
+		)
 
 
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
@@ -380,15 +387,14 @@ class HeroBase:
 	def add_move_to_monsters_close_to_my_base(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
 			self.add_possible_action(
-				self.get_weight_action_move_to_monster_close_to_my_base,
 				self.action_move_to_monster,
-				self.get_action_with_arguments(HeroBase.action_move_to_monster, "base", monster)
+				self.get_action_info(HeroBase.action_move_to_monster, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster)
 			)
 
 
-	def get_weight_action_move_to_monster_close_to_my_base(self, action_arguments, action_with_arguments):
+	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(500, action_with_arguments) +
+			self.get_locked_penalty_weight(500, action, action_arguments) +
 			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.01 +
 			self.get_weight_monster_distance_to_base(*action_arguments) * 0.3 +
 			self.get_weight_threat_for_my_base(*action_arguments) * 2000
