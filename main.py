@@ -420,13 +420,13 @@ class ActionRendezvous(ActionBase):
 
 
 	def action_rendezvous(self, action_info):
-		self.print_move(action_info, self.rendezvous.x, self.rendezvous.y)
+		self.print_move(action_info, self.hero_base.rendezvous.x, self.hero_base.rendezvous.y)
 
 
 	def get_weight_action_rendezvous(self, action, action_arguments):
 		return (
-			self.get_weight_move_to_rendezvous() +
-			self.get_weight_hero_distance_to_my_base() * 10
+			self.get_weight_move_to_rendezvous() * self.parent_hero_base.rendezvous_weight_multiplier +
+			self.get_weight_hero_distance_to_my_base() * self.parent_hero_base.rendezvous_weight_multiplier
 		)
 
 
@@ -463,43 +463,15 @@ class ActionMoveToAllMonsters(ActionBase):
 
 
 
-class ActionMoveToMonstersCloseToMyBase(ActionBase):
-	def __init__(self, parent_hero_base):
-		self.parent_hero_base = parent_hero_base
-
-		self.add_move_to_monsters_close_to_my_base()
-
-
-	def add_move_to_monsters_close_to_my_base(self):
-		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
-
-
-	def action_move_to_monster_close_to_my_base(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
-		return (
-			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
-			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) +
-			self.parent_hero_base.get_weight_threat_for_my_base(*action_arguments) +
-			self.get_weight_monster_distance_to_base(*action_arguments)
-		)
-
-
-	def get_weight_monster_distance_to_base(self, monster):
-		return monster.distance_from_my_base
-
-
-
-class HeroBase(ActionWait, ActionMoveToAllMonsters, ActionMoveToMonstersCloseToMyBase):
-	def __init__(self, parent_hero, entity, rendezvous):
+class HeroBase(ActionWait, ActionRendezvous, ActionMoveToAllMonsters):
+	def __init__(self, parent_hero, entity, rendezvous, rendezvous_weight_multiplier=1):
 		self.parent_hero = parent_hero
 
 		self.entity = entity
 
 		self.rendezvous = rendezvous
+
+		self.rendezvous_weight_multiplier = rendezvous_weight_multiplier
 
 		self.action_info = None
 
@@ -512,7 +484,6 @@ class HeroBase(ActionWait, ActionMoveToAllMonsters, ActionMoveToMonstersCloseToM
 		ActionWait(self)
 		ActionRendezvous(self)
 		ActionMoveToAllMonsters(self)
-		ActionMoveToMonstersCloseToMyBase(self)
 
 
 
@@ -559,33 +530,70 @@ class ActionBlowAwayFromBase(ActionBase):
 
 
 
-class HeroFarmer(HeroBase, ActionBlowAwayFromBase):
-	def __init__(self, parent_my_heroes, entity, rendezvous):
+class ActionMoveToMonstersCloseToMyBase(ActionBase):
+	def __init__(self, parent_hero_farmer):
+		self.parent_hero_farmer = parent_hero_farmer
+
+		self.add_move_to_monsters_close_to_my_base()
+
+
+	def add_move_to_monsters_close_to_my_base(self):
+		for monster in self.parent_hero_farmer.parent_my_heroes.parent_game.monsters.monsters:
+			self.parent_hero_farmer.hero_base.add_possible_action(self.parent_hero_farmer.hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
+
+
+	def action_move_to_monster_close_to_my_base(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
+		return (
+			self.parent_hero_farmer.hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.parent_hero_farmer.hero_base.get_weight_distance_to_monster(*action_arguments) +
+			self.parent_hero_farmer.hero_base.get_weight_threat_for_my_base(*action_arguments) +
+			self.get_weight_monster_distance_to_base(*action_arguments)
+		)
+
+
+	def get_weight_monster_distance_to_base(self, monster):
+		return monster.distance_from_my_base
+
+
+
+class HeroFarmer(HeroBase, ActionMoveToMonstersCloseToMyBase, ActionBlowAwayFromBase):
+	def __init__(self, parent_my_heroes, entity, rendezvous, rendezvous_weight_multiplier=5): # TODO: Find way around having to set rendezvous_weight_multiplier to 1
 		self.parent_my_heroes = parent_my_heroes
 
-		self.hero_base = HeroBase(self, entity, rendezvous)
-
-		self.rendezvous = rendezvous
+		self.hero_base = HeroBase(self, entity, rendezvous, rendezvous_weight_multiplier)
 
 
 	def add_possible_actions(self):
 		self.hero_base.add_possible_actions()
 
-		ActionBlowAwayFromBase(self)
+		ActionMoveToMonstersCloseToMyBase(self)
+		ActionBlowAwayFromBase(self) # TODO: Maybe move this to HeroBase?
+
+
+
+class ActionControl(ActionBase):
+	def __init__(self, parent_hero_attacker):
+		self.parent_hero_attacker = parent_hero_attacker
+
+		# self.add_control()
 
 
 
 class HeroAttacker(HeroBase):
-	def __init__(self, parent_my_heroes, entity, rendezvous):
+	def __init__(self, parent_my_heroes, entity, rendezvous, rendezvous_weight_multiplier=3): # TODO: Find way around having to set rendezvous_weight_multiplier to 1
 		self.parent_my_heroes = parent_my_heroes
 
-		self.hero_base = HeroBase(self, entity, rendezvous)
-
-		self.rendezvous = rendezvous
+		self.hero_base = HeroBase(self, entity, rendezvous, rendezvous_weight_multiplier)
 
 
 	def add_possible_actions(self):
 		self.hero_base.add_possible_actions()
+
+		ActionControl(self)
 
 
 
