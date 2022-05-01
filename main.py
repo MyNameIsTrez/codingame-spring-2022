@@ -425,8 +425,8 @@ class ActionRendezvous(ActionBase):
 
 	def get_weight_action_rendezvous(self, action, action_arguments):
 		return (
-			self.get_weight_move_to_rendezvous() * self.parent_hero_base.rendezvous_weight_multiplier +
-			self.get_weight_hero_distance_to_my_base() * self.parent_hero_base.rendezvous_weight_multiplier
+			self.get_weight_move_to_rendezvous() * 5 +
+			self.get_weight_hero_distance_to_my_base() * 5
 		)
 
 
@@ -464,14 +464,12 @@ class ActionMoveToAllMonsters(ActionBase):
 
 
 class HeroBase(ActionWait, ActionRendezvous, ActionMoveToAllMonsters):
-	def __init__(self, parent_hero, entity, rendezvous, rendezvous_weight_multiplier=1):
+	def __init__(self, parent_hero, entity, rendezvous):
 		self.parent_hero = parent_hero
 
 		self.entity = entity
 
 		self.rendezvous = rendezvous
-
-		self.rendezvous_weight_multiplier = rendezvous_weight_multiplier
 
 		self.action_info = None
 
@@ -561,10 +559,10 @@ class ActionMoveToMonstersCloseToMyBase(ActionBase):
 
 
 class HeroFarmer(HeroBase, ActionMoveToMonstersCloseToMyBase, ActionBlowAwayFromBase):
-	def __init__(self, parent_my_heroes, entity, rendezvous, rendezvous_weight_multiplier=5): # TODO: Find way around having to set rendezvous_weight_multiplier to 1
+	def __init__(self, parent_my_heroes, entity, rendezvous):
 		self.parent_my_heroes = parent_my_heroes
 
-		self.hero_base = HeroBase(self, entity, rendezvous, rendezvous_weight_multiplier)
+		self.hero_base = HeroBase(self, entity, rendezvous)
 
 
 	def add_possible_actions(self):
@@ -584,10 +582,10 @@ class ActionControl(ActionBase):
 
 
 class HeroAttacker(HeroBase):
-	def __init__(self, parent_my_heroes, entity, rendezvous, rendezvous_weight_multiplier=3): # TODO: Find way around having to set rendezvous_weight_multiplier to 1
+	def __init__(self, parent_my_heroes, entity, rendezvous=3):
 		self.parent_my_heroes = parent_my_heroes
 
-		self.hero_base = HeroBase(self, entity, rendezvous, rendezvous_weight_multiplier)
+		self.hero_base = HeroBase(self, entity, rendezvous)
 
 
 	def add_possible_actions(self):
