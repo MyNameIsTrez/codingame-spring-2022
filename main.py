@@ -1,4 +1,4 @@
-import math, sys, functools
+import math, sys
 
 from queue import PriorityQueue
 
@@ -149,8 +149,7 @@ class MyHeroes:
 			if not hero.action_with_arguments:
 				hero.action_with_arguments = action_with_arguments
 
-		for my_hero in self.my_heroes:
-			my_hero.action_with_arguments()
+		self.run_hero_actions()
 
 
 	def a_hero_has_no_action_assigned(self):
@@ -163,6 +162,11 @@ class MyHeroes:
 		for my_hero in self.my_heroes:
 			if not my_hero.action_with_arguments:
 				my_hero.add_possible_actions()
+
+
+	def run_hero_actions(self):
+		for my_hero in self.my_heroes:
+			my_hero.action_with_arguments["action"](my_hero, *my_hero.action_with_arguments["action_arguments"])
 
 
 
@@ -252,13 +256,13 @@ class Monster:
 	def __init__(self, parent_entities, entity):
 		self.parent_entities = parent_entities
 
-		self.threat_for_none = 0
-		self.threat_for_my_base = 1
-		self.threat_for_opponent_base = 2
-
 		self.entity = entity
 
-		self.targeted_by = []
+		# self.threat_for_none = 0
+		# self.threat_for_my_base = 1
+		# self.threat_for_opponent_base = 2
+
+		# self.targeted_by = []
 
 		self.save_distance_from_my_base()
 
@@ -291,7 +295,8 @@ class HeroBase:
 	def add_wait(self):
 		self.add_possible_action(
 			420420, # TODO: Does math.inf work?
-			self.action_wait
+			self.action_wait,
+			HeroBase.action_wait
 		)
 
 
@@ -304,12 +309,15 @@ class HeroBase:
 		print(f"WAIT {message}")
 
 
-	def add_possible_action(self, weight, action, *action_arguments):
+	def add_possible_action(self, weight, action_method, action, *action_arguments):
 		self.parent_hero.parent_my_heroes.possible_actions.put((
 			weight,
-			action.__repr__(), # This resolves equal weight collisions by essentially picking a random action.
+			action_method.__repr__(), # This resolves equal weight collisions by essentially picking a random action.
 			self.parent_hero,
-			functools.partial(action, *action_arguments)
+			{
+				"action": action,
+				"action_arguments": action_arguments
+			}
 		))
 
 
@@ -318,6 +326,7 @@ class HeroBase:
 			self.add_possible_action(
 				self.get_weight_action_move_to_monster(monster),
 				self.action_move_to_monster,
+				HeroBase.action_move_to_monster,
 				monster
 			)
 
