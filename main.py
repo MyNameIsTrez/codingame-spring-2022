@@ -41,19 +41,24 @@ class Game:
 
 	def run(self):
 		while True:
+			self.clear()
 			self.parse()
 			self.update()
 			self.round += 1
 
 
+	def clear(self):
+		self.my_heroes.clear()
+
+
 	def parse(self):
 		self.me.parse_health_and_mana()
 		self.opponent.parse_health_and_mana()
+		self.entities.parse_entities()
 
 
 	def update(self):
 		self.my_heroes.update()
-		self.entities.update()
 
 
 
@@ -89,9 +94,9 @@ class MyHeroes:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
 
-		self.my_heroes = []
 
-		self.possible_actions = PriorityQueue()
+	def clear(self):
+		self.my_heroes = []
 
 
 	def add_my_next_hero(self, entity):
@@ -133,11 +138,12 @@ class MyHeroes:
 
 
 	def update(self):
-		for my_hero in self.my_heroes:
-			my_hero.add_possible_actions()
-
 		while self.a_hero_has_no_action_assigned():
-			_, hero, action_with_arguments = self.possible_actions.get()
+			self.clear_action_with_argument_from_my_heroes()
+
+			self.recalculate_possible_actions()
+
+			_, _, hero, action_with_arguments = self.possible_actions.get()
 
 			if not hero.action_with_arguments:
 				hero.action_with_arguments = action_with_arguments
@@ -148,6 +154,19 @@ class MyHeroes:
 
 	def a_hero_has_no_action_assigned(self):
 		return any(my_hero.action_with_arguments == None for my_hero in self.my_heroes)
+
+
+	def clear_action_with_argument_from_my_heroes(self):
+		for my_hero in self.my_heroes:
+			my_hero.action_with_argument = None
+
+
+	def recalculate_possible_actions(self):
+		self.possible_actions = PriorityQueue()
+
+		for my_hero in self.my_heroes:
+			if not my_hero.action_with_arguments:
+				my_hero.add_possible_actions()
 
 
 
@@ -175,10 +194,6 @@ class Entities:
 		self.monster_type = 0
 		self.my_hero_type = 1
 		self.opponent_hero_type = 2
-
-
-	def update(self):
-		self.parse_entities()
 
 
 	def parse_entities(self):
@@ -269,7 +284,7 @@ class HeroBase:
 
 		self.entity = entity
 
-		self.action_with_arguments = None
+		self.action_with_arguments_ = None
 
 
 	def add_possible_actions(self):
@@ -279,8 +294,8 @@ class HeroBase:
 
 	def add_wait(self):
 		self.add_possible_action(
-			1337, # TODO: Does math.inf work?
-			functools.partial(self.action_wait)
+			420420, # TODO: Does math.inf work?
+			self.action_wait
 		)
 
 
@@ -293,15 +308,21 @@ class HeroBase:
 		print(f"WAIT {message}")
 
 
-	def add_possible_action(self, weight, action_with_arguments):
-		self.parent_hero.parent_my_heroes.possible_actions.put((weight, action_with_arguments))
+	def add_possible_action(self, weight, action, *action_arguments):
+		self.parent_hero.parent_my_heroes.possible_actions.put((
+			weight,
+			action.__repr__(), # This resolves equal weight collisions by essentially picking a random action.
+			self.parent_hero,
+			functools.partial(action, *action_arguments)
+		))
 
 
 	def add_move_to_all_targets(self):
-		for monster in self.parent_hero.parent_game.monsters.monsters:
+		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
 			self.add_possible_action(
 				self.get_weight_action_move_to_monster(monster),
-				functools.partial(self.action_move_to_monster, monster)
+				self.action_move_to_monster,
+				monster
 			)
 
 
@@ -320,6 +341,18 @@ class HeroBase:
 
 	def print_move(self, x, y, message=""):
 		print(f"MOVE {x} {y} {message}")
+
+
+	@property
+	def action_with_arguments(self):
+		return self.hero_base.action_with_arguments_
+		# return self.action_with_arguments_
+
+
+	@action_with_arguments.setter
+	def action_with_arguments(self, action_with_arguments):
+		self.hero_base.action_with_arguments_ = action_with_arguments
+		# self.action_with_arguments_ = action_with_arguments
 
 
 	# def get_hero_distance_to_monster(self, hero, monster):
