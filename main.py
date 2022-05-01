@@ -146,27 +146,27 @@ class MyHeroes:
 
 			_, _, hero, action_with_arguments = self.possible_actions.get()
 
-			if not hero.action_with_arguments:
-				hero.action_with_arguments = action_with_arguments
+			if not hero.hero_base.action_with_arguments:
+				hero.hero_base.action_with_arguments = action_with_arguments
 
 		self.run_hero_actions()
 
 
 	def a_hero_has_no_action_assigned(self):
-		return any(my_hero.action_with_arguments == None for my_hero in self.my_heroes)
+		return any(my_hero.hero_base.action_with_arguments == None for my_hero in self.my_heroes)
 
 
 	def recalculate_possible_actions(self):
 		self.possible_actions = PriorityQueue()
 
 		for my_hero in self.my_heroes:
-			if not my_hero.action_with_arguments:
+			if not my_hero.hero_base.action_with_arguments:
 				my_hero.add_possible_actions()
 
 
 	def run_hero_actions(self):
 		for my_hero in self.my_heroes:
-			my_hero.action_with_arguments["action"](my_hero, *my_hero.action_with_arguments["action_arguments"])
+			my_hero.hero_base.action_with_arguments["action"](my_hero, *my_hero.hero_base.action_with_arguments["action_arguments"])
 
 
 
@@ -284,7 +284,7 @@ class HeroBase:
 
 		self.entity = entity
 
-		self.action_with_arguments_ = None
+		self.action_with_arguments = None
 
 
 	def add_possible_actions(self):
@@ -300,7 +300,7 @@ class HeroBase:
 		)
 
 
-	# TODO: Change this method it predicts where the monster will be, instead of the current beelining.
+	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
 	def action_wait(self):
 		self.print_wait()
 
@@ -339,25 +339,13 @@ class HeroBase:
 		)
 
 
-	# TODO: Change this method it predicts where the monster will be, instead of the current beelining.
+	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
 	def action_move_to_monster(self, monster):
 		self.print_move(monster.entity.x, monster.entity.y)
 
 
 	def print_move(self, x, y, message=""):
 		print(f"MOVE {x} {y} {message}")
-
-
-	@property
-	def action_with_arguments(self):
-		return self.hero_base.action_with_arguments_
-		# return self.action_with_arguments_
-
-
-	@action_with_arguments.setter
-	def action_with_arguments(self, action_with_arguments):
-		self.hero_base.action_with_arguments_ = action_with_arguments
-		# self.action_with_arguments_ = action_with_arguments
 
 
 	# def get_hero_distance_to_monster(self, hero, monster):
