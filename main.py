@@ -375,7 +375,7 @@ class HeroBase:
 	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
 			self.get_locked_penalty_weight(1, action, action_arguments) +
-			self.get_weight_distance_to_monster(*action_arguments) * 10
+			self.get_weight_distance_to_monster(*action_arguments) * 5
 		)
 
 
@@ -441,6 +441,10 @@ class HeroBase:
 		return 0 if monster.entity.threat_for == monster.threat_for_my_base else Utils.infinite
 
 
+	def get_weight_enough_mana(self):
+		return 0 if self.parent_hero.parent_my_heroes.parent_game.me.mana >= 10 else Utils.infinite
+
+
 
 class HeroFarmer(HeroBase):
 	def __init__(self, parent_my_heroes, entity, rendezvous):
@@ -479,15 +483,20 @@ class HeroFarmer(HeroBase):
 
 	def get_weight_action_blow_monster_away_from_base(self, action, action_arguments):
 		return (
-			self.hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.hero_base.get_locked_penalty_weight(8, action, action_arguments) +
+			self.hero_base.get_weight_enough_mana() +
+			self.hero_base.get_weight_threat_for_my_base(*action_arguments) +
 			self.get_weight_in_wind_range(*action_arguments) +
-			self.hero_base.get_weight_monster_distance_to_base(*action_arguments) * 2 +
-			self.hero_base.get_weight_threat_for_my_base(*action_arguments)
+			self.get_weight_close_to_base(*action_arguments)
 		)
 
 
 	def get_weight_in_wind_range(self, monster):
 		return 0 if self.hero_base.get_weight_distance_to_monster(monster) <= self.hero_base.wind_range else Utils.infinite
+
+
+	def get_weight_close_to_base(self, monster):
+		return 0 if monster.distance_from_my_base <= 2000 else Utils.infinite
 
 
 
