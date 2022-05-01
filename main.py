@@ -199,6 +199,14 @@ class OpponentHeroes:
 
 
 
+class OpponentHero:
+	def __init__(self, parent_opponent_heroes, entity):
+		self.parent_opponent_heroes = parent_opponent_heroes
+
+		self.entity = entity
+
+
+
 class Entities:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
@@ -290,7 +298,35 @@ class Monster:
 
 
 
-class HeroBase:
+class ActionWait:
+	def __init__(self, parent_hero_base):
+		self.parent_hero_base = parent_hero_base
+
+		self.add_wait()
+
+
+	def add_wait(self):
+		self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionWait.action_wait, "wait", self.get_weight_action_wait))
+
+
+	def action_wait(self, action_info):
+		self.wait(action_info)
+
+
+	def wait(self, action_info):
+		self.print_wait(action_info)
+
+
+	def print_wait(self, action_info):
+		print(f"WAIT {action_info['label']} {action_info['weight']}")
+
+
+	def get_weight_action_wait(self, action, action_arguments):
+		return Utils.infinite
+
+
+
+class HeroBase(ActionWait):
 	def __init__(self, parent_hero, entity):
 		self.parent_hero = parent_hero
 
@@ -304,30 +340,9 @@ class HeroBase:
 
 
 	def add_possible_actions(self):
-		self.add_wait()
+		ActionWait(self)
 		self.add_move_to_all_monsters()
 		self.add_move_to_monsters_close_to_my_base()
-
-
-	def add_wait(self):
-		self.add_possible_action(self.get_action_info(HeroBase.action_wait, "wait", self.get_weight_action_wait))
-
-
-	def action_wait(self, action_info):
-		self.wait(action_info)
-
-
-	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def wait(self, action_info):
-		self.print_wait(action_info)
-
-
-	def print_wait(self, action_info):
-		print(f"WAIT {action_info['label']} {action_info['weight']}")
-
-
-	def get_weight_action_wait(self, action, action_arguments):
-		return Utils.infinite
 
 
 	def get_action_info(self, action, label, weight_method, *action_arguments):
@@ -500,13 +515,6 @@ class HeroAttacker(HeroBase):
 	def add_possible_actions(self):
 		self.hero_base.add_possible_actions()
 
-
-
-class OpponentHero:
-	def __init__(self, parent_opponent_heroes, entity):
-		self.parent_opponent_heroes = parent_opponent_heroes
-
-		self.entity = entity
 
 
 if __name__ == "__main__":
