@@ -178,7 +178,7 @@ class OpponentHeroes:
 		self.opponent_heroes = []
 
 
-	def get_opponent_hero(self, entity):
+	def add_opponent_hero(self, entity):
 		self.opponent_heroes.append(
 			OpponentHero(
 				self,
@@ -315,7 +315,7 @@ class HeroBase:
 
 
 	def get_weight_action_wait(self, action, action_arguments):
-		return 4242 # TODO: Does math.inf work?
+		return 4242
 
 
 	def get_action_info(self, action, label, weight_method, *action_arguments):
@@ -330,10 +330,14 @@ class HeroBase:
 	def add_possible_action(self, action_method, action_info):
 		self.parent_hero.parent_my_heroes.possible_actions.put((
 			action_info["weight"],
-			action_method.__repr__(), # This resolves equal weight collisions by essentially picking a random action.
+			self.get_uncollidable_hash(action_method, action_info),
 			self.parent_hero,
 			action_info
 		))
+
+
+	def get_uncollidable_hash(self, action_method, action_info):
+		return action_method.__repr__() + action_info["action_arguments"].__repr__()
 
 
 	def add_move_to_all_monsters(self):
@@ -344,10 +348,19 @@ class HeroBase:
 			)
 
 
+	def action_move_to_monster(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
+	def move_to_monster(self, action_info, monster):
+		self.print_move(action_info, monster.entity.x, monster.entity.y)
+
+
 	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
 			self.get_locked_penalty_weight(500, action, action_arguments) +
-			self.get_weight_action_move_to_monster_raw(*action_arguments) * 10
+			self.get_weight_action_move_to_monster_raw(*action_arguments)
 		)
 
 
@@ -380,15 +393,6 @@ class HeroBase:
 		)
 
 
-	def action_move_to_monster(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def move_to_monster(self, action_info, monster):
-		self.print_move(action_info, monster.entity.x, monster.entity.y)
-
-
 	def print_move(self, action_info, x, y):
 		print(f"MOVE {x} {y} {action_info['label']} {action_info['weight']}")
 
@@ -396,21 +400,21 @@ class HeroBase:
 	def add_move_to_monsters_close_to_my_base(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
 			self.add_possible_action(
-				self.action_move_to_monsters_close_to_my_base,
-				self.get_action_info(HeroBase.action_move_to_monster, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster)
+				self.action_move_to_monster_close_to_my_base,
+				self.get_action_info(HeroBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster)
 			)
 
 
-	def action_move_to_monsters_close_to_my_base(self, action_info, monster):
+	def action_move_to_monster_close_to_my_base(self, action_info, monster):
 		self.move_to_monster(action_info, monster)
 
 
 	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
 		return (
 			self.get_locked_penalty_weight(500, action, action_arguments) +
-			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.01 +
+			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.1 +
 			self.get_weight_monster_distance_to_base(*action_arguments) * 0.3 +
-			self.get_weight_threat_for_my_base(*action_arguments) * 2000
+			self.get_weight_threat_for_my_base(*action_arguments) * 424242
 		)
 
 
