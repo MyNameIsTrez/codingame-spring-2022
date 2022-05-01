@@ -5,6 +5,8 @@ from queue import PriorityQueue
 
 
 class Utils:
+	infinite = 424242
+
 	@staticmethod
 	def debug(*args, **kwargs):
 		print(*args, **kwargs, file=sys.stderr)
@@ -27,8 +29,10 @@ class Game:
 		self.round = 0
 
 		self.me = Player(self)
-		self.me.init_me()
+		self.me.init_my_coordinates()
+
 		self.opponent = Player(self)
+		self.opponent.init_opponent_coordinates()
 
 		self.heroes_per_player = int(input())
 
@@ -68,8 +72,15 @@ class Player:
 		self.parent_game = parent_game
 
 
-	def init_me(self):
+	def init_my_coordinates(self):
 		self.x, self.y = Utils.get_ints_from_line()
+
+
+	def init_opponent_coordinates(self):
+		if self.parent_game.me.x == 0:
+			self.x, self.y = 17630, 9000
+		else:
+			self.x, self.y = 0, 0
 
 
 	def parse_health_and_mana(self):
@@ -287,6 +298,10 @@ class HeroBase:
 
 		self.action_info = None
 
+		self.penalty_weight = 1000
+
+		self.wind_range = 1280
+
 
 	def add_possible_actions(self):
 		self.add_wait()
@@ -315,7 +330,7 @@ class HeroBase:
 
 
 	def get_weight_action_wait(self, action, action_arguments):
-		return 4242
+		return Utils.infinite
 
 
 	def get_action_info(self, action, label, weight_method, *action_arguments):
@@ -359,20 +374,20 @@ class HeroBase:
 
 	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(500, action, action_arguments) +
-			self.get_weight_action_move_to_monster_raw(*action_arguments)
+			self.get_locked_penalty_weight(1, action, action_arguments) +
+			self.get_weight_distance_to_monster(*action_arguments) * 10
 		)
 
 
 	# TODO: Change this method once the heroes don't beeline the monster anymore.
-	def get_weight_action_move_to_monster_raw(self, monster):
+	def get_weight_distance_to_monster(self, monster):
 		return math.dist(
 			(self.entity.x, self.entity.y),
 			(monster.entity.x, monster.entity.y)
 		)
 
 
-	def get_locked_penalty_weight(self, penalty_weight, action, action_arguments):
+	def get_locked_penalty_weight(self, penalty_weight_multiplier, action, action_arguments):
 		total_penalty_weight = 0
 
 		for other_my_hero in self.parent_hero.parent_my_heroes.my_heroes:
@@ -380,7 +395,7 @@ class HeroBase:
 				continue
 
 			if self.action_already_locked(other_my_hero, action, action_arguments):
-				total_penalty_weight += penalty_weight
+				total_penalty_weight += self.penalty_weight * penalty_weight_multiplier
 
 		return total_penalty_weight
 
@@ -411,10 +426,10 @@ class HeroBase:
 
 	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(500, action, action_arguments) +
-			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.1 +
-			self.get_weight_monster_distance_to_base(*action_arguments) * 0.3 +
-			self.get_weight_threat_for_my_base(*action_arguments) * 424242
+			self.get_locked_penalty_weight(1, action, action_arguments) +
+			self.get_weight_distance_to_monster(*action_arguments) +
+			self.get_weight_monster_distance_to_base(*action_arguments) +
+			self.get_weight_threat_for_my_base(*action_arguments)
 		)
 
 
@@ -423,7 +438,7 @@ class HeroBase:
 
 
 	def get_weight_threat_for_my_base(self, monster):
-		return monster.entity.threat_for != monster.threat_for_my_base
+		return 0 if monster.entity.threat_for == monster.threat_for_my_base else Utils.infinite
 
 
 
@@ -439,17 +454,40 @@ class HeroFarmer(HeroBase):
 	def add_possible_actions(self):
 		self.hero_base.add_possible_actions()
 
-		# self.parent_my_heroes.add_possible_action(
-		# 	Action()
-		# )
+		self.add_blow_away_from_base()
 
 
-	# def move(self):
-	# 	if self.hero_base.target is not None:
-	# 		# TODO: Lead the monster
-	# 		self.hero_base.print_move(self.hero_base.target.entity.x, self.hero_base.target.entity.y)
-	# 	else:
-	# 		self.hero_base.move()
+	def add_blow_away_from_base(self):
+		for monster in self.parent_my_heroes.parent_game.monsters.monsters:
+			self.hero_base.add_possible_action(
+				self.action_blow_monster_away_from_base,
+				self.get_action_info(HeroFarmer.action_blow_monster_away_from_base, "blow away base", self.get_weight_action_blow_monster_away_from_base, monster)
+			)
+
+
+	def action_blow_monster_away_from_base(self, action_info, monster):
+		self.blow_monster_towards_enemy_base(action_info)
+
+
+	def blow_monster_towards_enemy_base(self, action_info):
+		self.print_blow(action_info, self.parent_my_heroes.parent_game.opponent.x, self.parent_my_heroes.parent_game.opponent.y)
+
+
+	def print_blow(self, action_info, x, y):
+		print(f"SPELL WIND {x} {y} {action_info['label']} {action_info['weight']}")
+
+
+	def get_weight_action_blow_monster_away_from_base(self, action, action_arguments):
+		return (
+			self.hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.get_weight_in_wind_range(*action_arguments) +
+			self.hero_base.get_weight_monster_distance_to_base(*action_arguments) * 2 +
+			self.hero_base.get_weight_threat_for_my_base(*action_arguments)
+		)
+
+
+	def get_weight_in_wind_range(self, monster):
+		return 0 if self.hero_base.get_weight_distance_to_monster(monster) <= self.hero_base.wind_range else Utils.infinite
 
 
 
@@ -464,10 +502,6 @@ class HeroAttacker(HeroBase):
 
 	def add_possible_actions(self):
 		self.hero_base.add_possible_actions()
-
-
-	# def move(self):
-	# 	self.hero_base.move()
 
 
 
