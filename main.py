@@ -345,7 +345,16 @@ class ActionMoveToAllMonsters:
 	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
 			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
-			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) * 5
+			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) +
+			self.get_weight_hero_distance_to_my_base()
+		)
+
+
+	def get_weight_hero_distance_to_my_base(self):
+		my_base = self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.me
+		return math.dist(
+			(self.parent_hero_base.entity.x, self.parent_hero_base.entity.y),
+			(my_base.x, my_base.y)
 		)
 
 
