@@ -326,7 +326,36 @@ class ActionWait:
 
 
 
-class HeroBase(ActionWait):
+class ActionMoveToAllMonsters:
+	def __init__(self, parent_hero_base):
+		self.parent_hero_base = parent_hero_base
+
+		self.add_move_to_all_monsters()
+
+
+	def add_move_to_all_monsters(self):
+		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
+			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(HeroBase.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
+
+
+	def action_move_to_monster(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
+	def move_to_monster(self, action_info, monster):
+		self.print_move(action_info, monster.entity.x, monster.entity.y)
+
+
+	def get_weight_action_move_to_monster(self, action, action_arguments):
+		return (
+			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) * 5
+		)
+
+
+
+class HeroBase(ActionWait, ActionMoveToAllMonsters):
 	def __init__(self, parent_hero, entity):
 		self.parent_hero = parent_hero
 
@@ -341,7 +370,7 @@ class HeroBase(ActionWait):
 
 	def add_possible_actions(self):
 		ActionWait(self)
-		self.add_move_to_all_monsters()
+		ActionMoveToAllMonsters(self)
 		self.add_move_to_monsters_close_to_my_base()
 
 
@@ -365,27 +394,6 @@ class HeroBase(ActionWait):
 
 	def get_uncollidable_hash(self, action_info):
 		return self.__repr__() + action_info["action"].__repr__() + action_info["action_arguments"].__repr__()
-
-
-	def add_move_to_all_monsters(self):
-		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.add_possible_action(self.get_action_info(HeroBase.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
-
-
-	def action_move_to_monster(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def move_to_monster(self, action_info, monster):
-		self.print_move(action_info, monster.entity.x, monster.entity.y)
-
-
-	def get_weight_action_move_to_monster(self, action, action_arguments):
-		return (
-			self.get_locked_penalty_weight(1, action, action_arguments) +
-			self.get_weight_distance_to_monster(*action_arguments) * 5
-		)
 
 
 	# TODO: Change this method once the heroes don't beeline the monster anymore.
