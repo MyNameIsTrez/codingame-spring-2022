@@ -310,10 +310,7 @@ class HeroBase:
 
 
 	def add_wait(self):
-		self.add_possible_action(
-			self.action_wait,
-			self.get_action_info(HeroBase.action_wait, "wait", self.get_weight_action_wait)
-		)
+		self.add_possible_action(self.get_action_info(HeroBase.action_wait, "wait", self.get_weight_action_wait))
 
 
 	def action_wait(self, action_info):
@@ -342,25 +339,22 @@ class HeroBase:
 		}
 
 
-	def add_possible_action(self, action_method, action_info):
+	def add_possible_action(self, action_info):
 		self.parent_hero.parent_my_heroes.possible_actions.put((
 			action_info["weight"],
-			self.get_uncollidable_hash(action_method, action_info),
+			self.get_uncollidable_hash(action_info),
 			self.parent_hero,
 			action_info
 		))
 
 
-	def get_uncollidable_hash(self, action_method, action_info):
-		return action_method.__repr__() + action_info["action_arguments"].__repr__()
+	def get_uncollidable_hash(self, action_info):
+		return self.__repr__() + action_info["action"].__repr__() + action_info["action_arguments"].__repr__()
 
 
 	def add_move_to_all_monsters(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.add_possible_action(
-				self.action_move_to_monster,
-				self.get_action_info(HeroBase.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster)
-			)
+			self.add_possible_action(self.get_action_info(HeroBase.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
 
 
 	def action_move_to_monster(self, action_info, monster):
@@ -414,10 +408,7 @@ class HeroBase:
 
 	def add_move_to_monsters_close_to_my_base(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.add_possible_action(
-				self.action_move_to_monster_close_to_my_base,
-				self.get_action_info(HeroBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster)
-			)
+			self.add_possible_action(self.get_action_info(HeroBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
 
 
 	def action_move_to_monster_close_to_my_base(self, action_info, monster):
@@ -463,10 +454,7 @@ class HeroFarmer(HeroBase):
 
 	def add_blow_away_from_base(self):
 		for monster in self.parent_my_heroes.parent_game.monsters.monsters:
-			self.hero_base.add_possible_action(
-				self.action_blow_monster_away_from_base,
-				self.get_action_info(HeroFarmer.action_blow_monster_away_from_base, "blow away base", self.get_weight_action_blow_monster_away_from_base, monster)
-			)
+			self.hero_base.add_possible_action(self.get_action_info(HeroFarmer.action_blow_monster_away_from_base, "blow away base", self.get_weight_action_blow_monster_away_from_base, monster))
 
 
 	def action_blow_monster_away_from_base(self, action_info, monster):
