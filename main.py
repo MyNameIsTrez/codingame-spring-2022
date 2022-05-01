@@ -335,16 +335,11 @@ class ActionMoveToAllMonsters:
 
 	def add_move_to_all_monsters(self):
 		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(HeroBase.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
+			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToAllMonsters.action_move_to_monster, "closest", self.get_weight_action_move_to_monster, monster))
 
 
 	def action_move_to_monster(self, action_info, monster):
 		self.move_to_monster(action_info, monster)
-
-
-	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def move_to_monster(self, action_info, monster):
-		self.print_move(action_info, monster.entity.x, monster.entity.y)
 
 
 	def get_weight_action_move_to_monster(self, action, action_arguments):
@@ -352,6 +347,36 @@ class ActionMoveToAllMonsters:
 			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
 			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) * 5
 		)
+
+
+
+class ActionMoveToMonstersCloseToMyBase:
+	def __init__(self, parent_hero_base):
+		self.parent_hero_base = parent_hero_base
+
+		self.add_move_to_monsters_close_to_my_base()
+
+
+	def add_move_to_monsters_close_to_my_base(self):
+		for monster in self.parent_hero_base.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
+			self.parent_hero_base.add_possible_action(self.parent_hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
+
+
+	def action_move_to_monster_close_to_my_base(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
+		return (
+			self.parent_hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.parent_hero_base.get_weight_distance_to_monster(*action_arguments) +
+			self.parent_hero_base.get_weight_threat_for_my_base(*action_arguments) +
+			self.get_weight_monster_distance_to_base(*action_arguments)
+		)
+
+
+	def get_weight_monster_distance_to_base(self, monster):
+		return monster.distance_from_my_base
 
 
 
@@ -371,7 +396,7 @@ class HeroBase(ActionWait, ActionMoveToAllMonsters):
 	def add_possible_actions(self):
 		ActionWait(self)
 		ActionMoveToAllMonsters(self)
-		self.add_move_to_monsters_close_to_my_base()
+		ActionMoveToMonstersCloseToMyBase(self)
 
 
 	def get_action_info(self, action, label, weight_method, *action_arguments):
@@ -404,6 +429,11 @@ class HeroBase(ActionWait, ActionMoveToAllMonsters):
 		)
 
 
+	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
+	def move_to_monster(self, action_info, monster):
+		self.print_move(action_info, monster.entity.x, monster.entity.y)
+
+
 	def get_locked_penalty_weight(self, penalty_weight_multiplier, action, action_arguments):
 		total_penalty_weight = 0
 
@@ -427,28 +457,6 @@ class HeroBase(ActionWait, ActionMoveToAllMonsters):
 
 	def print_move(self, action_info, x, y):
 		print(f"MOVE {x} {y} {action_info['label']} {action_info['weight']}")
-
-
-	def add_move_to_monsters_close_to_my_base(self):
-		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
-			self.add_possible_action(self.get_action_info(HeroBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
-
-
-	def action_move_to_monster_close_to_my_base(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
-		return (
-			self.get_locked_penalty_weight(1, action, action_arguments) +
-			self.get_weight_distance_to_monster(*action_arguments) +
-			self.get_weight_monster_distance_to_base(*action_arguments) +
-			self.get_weight_threat_for_my_base(*action_arguments)
-		)
-
-
-	def get_weight_monster_distance_to_base(self, monster):
-		return monster.distance_from_my_base
 
 
 	def get_weight_threat_for_my_base(self, monster):
