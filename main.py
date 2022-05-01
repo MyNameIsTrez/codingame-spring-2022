@@ -166,7 +166,8 @@ class MyHeroes:
 
 	def run_hero_actions(self):
 		for my_hero in self.my_heroes:
-			my_hero.hero_base.action_info["action"](my_hero, my_hero.hero_base.action_info["label"], *my_hero.hero_base.action_info["action_arguments"])
+			action_info = my_hero.hero_base.action_info
+			action_info["action"](my_hero, action_info, *action_info["action_arguments"])
 
 
 
@@ -300,13 +301,17 @@ class HeroBase:
 		)
 
 
+	def action_wait(self, action_info):
+		self.wait(action_info)
+
+
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def action_wait(self, label):
-		self.print_wait(label)
+	def wait(self, action_info):
+		self.print_wait(action_info)
 
 
-	def print_wait(self, label=""):
-		print(f"WAIT {label}")
+	def print_wait(self, action_info):
+		print(f"WAIT {action_info['label']} {action_info['weight']}")
 
 
 	def get_weight_action_wait(self, action, action_arguments):
@@ -317,7 +322,7 @@ class HeroBase:
 		return {
 			"action": action,
 			"label": label,
-			"weight": weight_method(action, action_arguments),
+			"weight": int(weight_method(action, action_arguments)),
 			"action_arguments": action_arguments
 		}
 
@@ -375,21 +380,29 @@ class HeroBase:
 		)
 
 
+	def action_move_to_monster(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def action_move_to_monster(self, label, monster):
-		self.print_move(monster.entity.x, monster.entity.y, label)
+	def move_to_monster(self, action_info, monster):
+		self.print_move(action_info, monster.entity.x, monster.entity.y)
 
 
-	def print_move(self, x, y, label=""):
-		print(f"MOVE {x} {y} {label}")
+	def print_move(self, action_info, x, y):
+		print(f"MOVE {x} {y} {action_info['label']} {action_info['weight']}")
 
 
 	def add_move_to_monsters_close_to_my_base(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
 			self.add_possible_action(
-				self.action_move_to_monster,
+				self.action_move_to_monsters_close_to_my_base,
 				self.get_action_info(HeroBase.action_move_to_monster, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster)
 			)
+
+
+	def action_move_to_monsters_close_to_my_base(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
 
 
 	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
