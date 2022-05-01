@@ -166,7 +166,7 @@ class MyHeroes:
 
 	def run_hero_actions(self):
 		for my_hero in self.my_heroes:
-			my_hero.hero_base.action_with_arguments["action"](my_hero, *my_hero.hero_base.action_with_arguments["action_arguments"])
+			my_hero.hero_base.action_with_arguments["action"](my_hero, my_hero.hero_base.action_with_arguments["label"], *my_hero.hero_base.action_with_arguments["action_arguments"])
 
 
 
@@ -297,7 +297,7 @@ class HeroBase:
 		self.add_possible_action(
 			self.get_weight_action_wait,
 			self.action_wait,
-			self.get_action_with_arguments(HeroBase.action_wait)
+			self.get_action_with_arguments(HeroBase.action_wait, "wait")
 		)
 
 
@@ -305,20 +305,21 @@ class HeroBase:
 		return 4242 # TODO: Does math.inf work?
 
 
-	def get_action_with_arguments(self, action, *action_arguments):
+	def get_action_with_arguments(self, action, label, *action_arguments):
 		return {
 			"action": action,
+			"label": label,
 			"action_arguments": action_arguments
 		}
 
 
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def action_wait(self):
-		self.print_wait()
+	def action_wait(self, label):
+		self.print_wait(label)
 
 
-	def print_wait(self, message=""):
-		print(f"WAIT {message}")
+	def print_wait(self, label=""):
+		print(f"WAIT {label}")
 
 
 	def add_possible_action(self, weight_method, action_method, action_with_arguments):
@@ -335,14 +336,14 @@ class HeroBase:
 			self.add_possible_action(
 				self.get_weight_action_move_to_monster,
 				self.action_move_to_monster,
-				self.get_action_with_arguments(HeroBase.action_move_to_monster, monster)
+				self.get_action_with_arguments(HeroBase.action_move_to_monster, "closest", monster)
 			)
 
 
 	def get_weight_action_move_to_monster(self, action_arguments, action_with_arguments):
 		return (
 			self.get_locked_penalty_weight(500, action_with_arguments) +
-			self.get_weight_action_move_to_monster_raw(*action_arguments)
+			self.get_weight_action_move_to_monster_raw(*action_arguments) * 10
 		)
 
 
@@ -368,12 +369,12 @@ class HeroBase:
 
 
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
-	def action_move_to_monster(self, monster):
-		self.print_move(monster.entity.x, monster.entity.y)
+	def action_move_to_monster(self, label, monster):
+		self.print_move(monster.entity.x, monster.entity.y, label)
 
 
-	def print_move(self, x, y, message=""):
-		print(f"MOVE {x} {y} {message}")
+	def print_move(self, x, y, label=""):
+		print(f"MOVE {x} {y} {label}")
 
 
 	def add_move_to_monsters_close_to_my_base(self):
@@ -381,25 +382,25 @@ class HeroBase:
 			self.add_possible_action(
 				self.get_weight_action_move_to_monster_close_to_my_base,
 				self.action_move_to_monster,
-				self.get_action_with_arguments(HeroBase.action_move_to_monster, monster)
+				self.get_action_with_arguments(HeroBase.action_move_to_monster, "base", monster)
 			)
 
 
 	def get_weight_action_move_to_monster_close_to_my_base(self, action_arguments, action_with_arguments):
 		return (
 			self.get_locked_penalty_weight(500, action_with_arguments) +
-			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.1 +
-			self.get_weight_hero_distance_to_monster(*action_arguments) +
-			self.get_weight_threat_for_my_base(*action_arguments)
+			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.01 +
+			self.get_weight_monster_distance_to_base(*action_arguments) * 0.3 +
+			self.get_weight_threat_for_my_base(*action_arguments) * 2000
 		)
 
 
-	def get_weight_hero_distance_to_monster(self, monster):
+	def get_weight_monster_distance_to_base(self, monster):
 		return monster.distance_from_my_base
 
 
 	def get_weight_threat_for_my_base(self, monster):
-		return monster.entity.threat_for != monster.threat_for_my_base * 2000
+		return monster.entity.threat_for != monster.threat_for_my_base
 
 
 
