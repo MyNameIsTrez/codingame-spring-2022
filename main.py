@@ -259,7 +259,7 @@ class Monster:
 		self.entity = entity
 
 		# self.threat_for_none = 0
-		# self.threat_for_my_base = 1
+		self.threat_for_my_base = 1
 		# self.threat_for_opponent_base = 2
 
 		# self.targeted_by = []
@@ -289,15 +289,27 @@ class HeroBase:
 
 	def add_possible_actions(self):
 		self.add_wait()
-		self.add_move_to_all_targets()
+		self.add_move_to_all_monsters()
+		self.add_move_to_monsters_close_to_my_base()
 
 
 	def add_wait(self):
 		self.add_possible_action(
-			420420, # TODO: Does math.inf work?
+			self.get_weight_action_wait,
 			self.action_wait,
-			HeroBase.action_wait
+			self.get_action_with_arguments(HeroBase.action_wait)
 		)
+
+
+	def get_weight_action_wait(self, action_arguments, action_with_arguments):
+		return 4242 # TODO: Does math.inf work?
+
+
+	def get_action_with_arguments(self, action, *action_arguments):
+		return {
+			"action": action,
+			"action_arguments": action_arguments
+		}
 
 
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
@@ -309,34 +321,50 @@ class HeroBase:
 		print(f"WAIT {message}")
 
 
-	def add_possible_action(self, weight, action_method, action, *action_arguments):
+	def add_possible_action(self, weight_method, action_method, action_with_arguments):
 		self.parent_hero.parent_my_heroes.possible_actions.put((
-			weight,
+			weight_method(action_with_arguments["action_arguments"], action_with_arguments),
 			action_method.__repr__(), # This resolves equal weight collisions by essentially picking a random action.
 			self.parent_hero,
-			{
-				"action": action,
-				"action_arguments": action_arguments
-			}
+			action_with_arguments
 		))
 
 
-	def add_move_to_all_targets(self):
+	def add_move_to_all_monsters(self):
 		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
 			self.add_possible_action(
-				self.get_weight_action_move_to_monster(monster),
+				self.get_weight_action_move_to_monster,
 				self.action_move_to_monster,
-				HeroBase.action_move_to_monster,
-				monster
+				self.get_action_with_arguments(HeroBase.action_move_to_monster, monster)
 			)
 
 
+	def get_weight_action_move_to_monster(self, action_arguments, action_with_arguments):
+		return (
+			self.get_locked_penalty_weight(500, action_with_arguments) +
+			self.get_weight_action_move_to_monster_raw(*action_arguments)
+		)
+
+
 	# TODO: Change this method once the heroes don't beeline the monster anymore.
-	def get_weight_action_move_to_monster(self, monster):
+	def get_weight_action_move_to_monster_raw(self, monster):
 		return math.dist(
 			(self.entity.x, self.entity.y),
 			(monster.entity.x, monster.entity.y)
 		)
+
+
+	def get_locked_penalty_weight(self, penalty_weight, action_with_arguments):
+		total_penalty_weight = 0
+
+		for other_my_hero in self.parent_hero.parent_my_heroes.my_heroes:
+			if other_my_hero == self.parent_hero:
+				continue
+
+			if other_my_hero.hero_base.action_with_arguments == action_with_arguments:
+				total_penalty_weight += penalty_weight
+
+		return total_penalty_weight
 
 
 	# TODO: Change this method so it predicts where the monster will be, instead of doing the current beelining.
@@ -348,43 +376,30 @@ class HeroBase:
 		print(f"MOVE {x} {y} {message}")
 
 
-	# def get_hero_distance_to_monster(self, hero, monster):
+	def add_move_to_monsters_close_to_my_base(self):
+		for monster in self.parent_hero.parent_my_heroes.parent_game.monsters.monsters:
+			self.add_possible_action(
+				self.get_weight_action_move_to_monster_close_to_my_base,
+				self.action_move_to_monster,
+				self.get_action_with_arguments(HeroBase.action_move_to_monster, monster)
+			)
 
 
-	# def assign_heroes(self):
-	# 	for my_hero in self.my_heroes:
-	# 		self.speculatively_assign_hero(
-	# 			my_hero,
-	# 			lambda unsorted_monster:
-	# 				unsorted_monster.distance_from_my_base +
-	# 				self.get_hero_distance_to_monster(my_hero, unsorted_monster)
-	# 		)
-
-	# 	for my_hero in self.my_heroes:
-	# 		if my_hero.hero_base.target:
-	# 			# TODO: Reuse lambda above and penalize enemies that are targeted by many of my heroes.
-	# 			self.optimally_reassign_hero(my_hero)
+	def get_weight_action_move_to_monster_close_to_my_base(self, action_arguments, action_with_arguments):
+		return (
+			self.get_locked_penalty_weight(500, action_with_arguments) +
+			self.get_weight_action_move_to_monster_raw(*action_arguments) * 0.1 +
+			self.get_weight_hero_distance_to_monster(*action_arguments) +
+			self.get_weight_threat_for_my_base(*action_arguments)
+		)
 
 
-	# def speculatively_assign_hero(self, my_hero, lambda_):
-	# 	for monster in sorted(self.parent_entities.monsters, key=lambda_):
-	# 		if monster.entity.threat_for == monster.threat_for_my_base:
-	# 			my_hero.hero_base.target = monster
-	# 			monster.targeted_by.append(my_hero)
-	# 			return
+	def get_weight_hero_distance_to_monster(self, monster):
+		return monster.distance_from_my_base
 
 
-	# def optimally_reassign_hero(self, my_hero):
-	# 	# for targeted_by in my_hero.hero_base.target.targeted_by:
-	# 	# 	if targeted_by is not my_hero:
-	# 	# 		if self.get_hero_distance_to_monster(targeted_by, my_hero.hero_base.target) < self.get_hero_distance_to_monster(my_hero, my_hero.hero_base.target):
-	# 	# 			my_hero.hero_base.target = None # TODO: Assign to second-best target.
-	# 	# 			return
-	# 	pass
-
-
-	# 	if self.rendezvous is not None: # Prevents yellow lines under .x and .y
-	# 		self.print_move(self.rendezvous.x, self.rendezvous.y)
+	def get_weight_threat_for_my_base(self, monster):
+		return monster.entity.threat_for != monster.threat_for_my_base * 2000
 
 
 
