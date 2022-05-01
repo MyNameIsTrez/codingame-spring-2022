@@ -485,16 +485,37 @@ class HeroBase(ActionWait, ActionRendezvous, ActionMoveToAllMonsters):
 
 
 
-class ActionBlowAwayFromBase(ActionBase):
-	def __init__(self, parent_hero_farmer):
+class ActionMoveToMonstersCloseToMyBase(ActionBase):
+	def __init__(self, parent_hero_farmer, get_weight_method):
 		self.parent_hero_farmer = parent_hero_farmer
 
-		self.add_blow_away_from_base()
+		self.add_move_to_monsters_close_to_my_base(get_weight_method)
 
 
-	def add_blow_away_from_base(self):
+	def add_move_to_monsters_close_to_my_base(self, get_weight_method):
 		for monster in self.parent_hero_farmer.parent_my_heroes.parent_game.monsters.monsters:
-			self.parent_hero_farmer.hero_base.add_possible_action(self.parent_hero_farmer.get_action_info(ActionBlowAwayFromBase.action_blow_monster_away_from_base, "blow away base", self.get_weight_action_blow_monster_away_from_base, monster))
+			self.parent_hero_farmer.hero_base.add_possible_action(self.parent_hero_farmer.hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base",get_weight_method, monster))
+
+
+	def action_move_to_monster_close_to_my_base(self, action_info, monster):
+		self.move_to_monster(action_info, monster)
+
+
+	def get_weight_monster_distance_to_base(self, monster):
+		return monster.distance_from_my_base
+
+
+
+class ActionBlowAwayFromBase(ActionBase):
+	def __init__(self, parent_hero_farmer, get_weight_method):
+		self.parent_hero_farmer = parent_hero_farmer
+
+		self.add_blow_away_from_base(get_weight_method)
+
+
+	def add_blow_away_from_base(self, get_weight_method):
+		for monster in self.parent_hero_farmer.parent_my_heroes.parent_game.monsters.monsters:
+			self.parent_hero_farmer.hero_base.add_possible_action(self.parent_hero_farmer.get_action_info(ActionBlowAwayFromBase.action_blow_monster_away_from_base, "blow away base", get_weight_method, monster))
 
 
 	def action_blow_monster_away_from_base(self, action_info, monster):
@@ -509,52 +530,12 @@ class ActionBlowAwayFromBase(ActionBase):
 		print(f"SPELL WIND {x} {y} {action_info['label']} {action_info['weight']}")
 
 
-	def get_weight_action_blow_monster_away_from_base(self, action, action_arguments):
-		return (
-			self.parent_hero_farmer.hero_base.get_locked_penalty_weight(8, action, action_arguments) +
-			self.parent_hero_farmer.hero_base.get_weight_enough_mana() +
-			self.parent_hero_farmer.hero_base.get_weight_threat_for_my_base(*action_arguments) +
-			self.get_weight_in_wind_range(*action_arguments) +
-			self.get_weight_close_to_base(*action_arguments)
-		)
-
-
 	def get_weight_in_wind_range(self, monster):
-		return 0 if self.parent_hero_farmer.hero_base.get_weight_distance_to_monster(monster) <= self.parent_hero_farmer.hero_base.wind_range else Utils.infinite
+		return 0 if self.hero_base.get_weight_distance_to_monster(monster) <= self.hero_base.wind_range else Utils.infinite
 
 
 	def get_weight_close_to_base(self, monster):
 		return 0 if monster.distance_from_my_base <= 2500 else Utils.infinite
-
-
-
-class ActionMoveToMonstersCloseToMyBase(ActionBase):
-	def __init__(self, parent_hero_farmer):
-		self.parent_hero_farmer = parent_hero_farmer
-
-		self.add_move_to_monsters_close_to_my_base()
-
-
-	def add_move_to_monsters_close_to_my_base(self):
-		for monster in self.parent_hero_farmer.parent_my_heroes.parent_game.monsters.monsters:
-			self.parent_hero_farmer.hero_base.add_possible_action(self.parent_hero_farmer.hero_base.get_action_info(ActionMoveToMonstersCloseToMyBase.action_move_to_monster_close_to_my_base, "base", self.get_weight_action_move_to_monster_close_to_my_base, monster))
-
-
-	def action_move_to_monster_close_to_my_base(self, action_info, monster):
-		self.move_to_monster(action_info, monster)
-
-
-	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
-		return (
-			self.parent_hero_farmer.hero_base.get_locked_penalty_weight(1, action, action_arguments) +
-			self.parent_hero_farmer.hero_base.get_weight_distance_to_monster(*action_arguments) +
-			self.parent_hero_farmer.hero_base.get_weight_threat_for_my_base(*action_arguments) +
-			self.get_weight_monster_distance_to_base(*action_arguments)
-		)
-
-
-	def get_weight_monster_distance_to_base(self, monster):
-		return monster.distance_from_my_base
 
 
 
@@ -568,8 +549,27 @@ class HeroFarmer(HeroBase, ActionMoveToMonstersCloseToMyBase, ActionBlowAwayFrom
 	def add_possible_actions(self):
 		self.hero_base.add_possible_actions()
 
-		ActionMoveToMonstersCloseToMyBase(self)
-		ActionBlowAwayFromBase(self) # TODO: Maybe move this to HeroBase?
+		ActionMoveToMonstersCloseToMyBase(self, self.get_weight_action_move_to_monster_close_to_my_base)
+		ActionBlowAwayFromBase(self, self.get_weight_action_blow_monster_away_from_base)
+
+
+	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
+		return (
+			self.hero_base.get_locked_penalty_weight(1, action, action_arguments) +
+			self.hero_base.get_weight_distance_to_monster(*action_arguments) +
+			self.hero_base.get_weight_threat_for_my_base(*action_arguments) +
+			self.get_weight_monster_distance_to_base(*action_arguments)
+		)
+
+
+	def get_weight_action_blow_monster_away_from_base(self, action, action_arguments):
+		return (
+			self.hero_base.get_locked_penalty_weight(8, action, action_arguments) +
+			self.hero_base.get_weight_enough_mana() +
+			self.hero_base.get_weight_threat_for_my_base(*action_arguments) +
+			self.get_weight_in_wind_range(*action_arguments) +
+			self.get_weight_close_to_base(*action_arguments)
+		)
 
 
 
