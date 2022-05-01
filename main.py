@@ -48,6 +48,7 @@ class Game:
 
 
 	def clear(self):
+		self.monsters.clear()
 		self.my_heroes.clear()
 
 
@@ -80,6 +81,8 @@ class Monsters:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
 
+
+	def clear(self):
 		self.monsters = []
 
 
@@ -139,8 +142,6 @@ class MyHeroes:
 
 	def update(self):
 		while self.a_hero_has_no_action_assigned():
-			self.clear_action_with_argument_from_my_heroes()
-
 			self.recalculate_possible_actions()
 
 			_, _, hero, action_with_arguments = self.possible_actions.get()
@@ -154,11 +155,6 @@ class MyHeroes:
 
 	def a_hero_has_no_action_assigned(self):
 		return any(my_hero.action_with_arguments == None for my_hero in self.my_heroes)
-
-
-	def clear_action_with_argument_from_my_heroes(self):
-		for my_hero in self.my_heroes:
-			my_hero.action_with_argument = None
 
 
 	def recalculate_possible_actions(self):
