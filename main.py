@@ -62,8 +62,8 @@ class Game:
 
 
 	def clear(self):
-		self.monsters.clear()
 		self.my_heroes.clear()
+		self.monsters.clear()
 
 
 	def parse(self):
@@ -120,12 +120,21 @@ class MyHeroes:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
 
-
-	def clear(self):
 		self.my_heroes = []
 
 
-	def add_my_next_hero(self, entity):
+	def clear(self):
+		self.my_hero_index = 0
+
+		self.clear_my_heroes()
+
+
+	def clear_my_heroes(self):
+		for my_hero in self.my_heroes:
+			my_hero.clear()
+
+
+	def add_or_update_my_next_hero(self, entity):
 		my_heroes_len = len(self.my_heroes)
 
 		if my_heroes_len == 0:
@@ -150,7 +159,7 @@ class MyHeroes:
 					)
 				)
 			)
-		else:
+		elif my_heroes_len == 2:
 			self.my_heroes.append(
 				HeroAttacker(
 					self,
@@ -161,6 +170,9 @@ class MyHeroes:
 					)
 				)
 			)
+		else:
+			self.my_heroes[self.my_hero_index].update(entity)
+			self.my_hero_index += 1
 
 
 	def update(self):
@@ -173,6 +185,8 @@ class MyHeroes:
 				hero.hero_base.action_info = action_info
 
 		self.run_hero_actions()
+
+		self.update_heroes_targeted_by_spells_in_previous_round()
 
 
 	def a_hero_has_no_action_assigned(self):
@@ -193,22 +207,21 @@ class MyHeroes:
 			action_info["action"](my_hero, action_info, *action_info["action_arguments"])
 
 
+	def update_heroes_targeted_by_spells_in_previous_round(self):
+		for my_hero in self.my_heroes:
+			my_hero.update_targeted_by_spell_in_previous_round()
+
+
 
 class OpponentHeroes:
 	def __init__(self, parent_game):
 		self.parent_game = parent_game
 
-		self.opponent_heroes = []
+		# self.opponent_heroes = []
 
 
-	def add_opponent_hero(self, entity):
-		self.opponent_heroes.append(
-			OpponentHero(
-				self,
-				entity
-			)
-		)
-
+	def add_or_update_next_opponent_hero(self, entity):
+		pass
 
 
 class OpponentHero:
@@ -232,18 +245,16 @@ class Entities:
 		self.entity_count = int(input())
 
 		for _ in range(self.entity_count):
-			entity = Entity(self)
-
-			self.add_entity(entity)
+			self.add_entity(Entity(self))
 
 
 	def add_entity(self, entity):
 		if entity.type_ == self.monster_type:
 			return self.parent_game.monsters.add_monster(entity)
 		elif entity.type_ == self.my_hero_type:
-			return self.parent_game.my_heroes.add_my_next_hero(entity)
+			return self.parent_game.my_heroes.add_or_update_my_next_hero(entity)
 		elif entity.type_ == self.opponent_hero_type:
-			return self.parent_game.opponent_heroes.add_opponent_hero(entity)
+			return self.parent_game.opponent_heroes.add_or_update_next_opponent_hero(entity)
 
 
 
@@ -470,8 +481,6 @@ class HeroBase:
 
 		self.rendezvous = rendezvous
 
-		self.action_info = None
-
 		self.penalty_weight = 10000
 
 		self.wind_range = 1280
@@ -479,6 +488,22 @@ class HeroBase:
 		self.control_range = 2200
 
 		self.shield_range = 2200
+
+		self.action_info = None
+
+		self.targeted_by_spell_in_previous_round = False
+
+
+	def clear(self):
+		self.action_info = None
+
+
+	def update(self, entity):
+		self.entity = entity
+
+
+	def update_targeted_by_spell_in_previous_round(self):
+		self.targeted_by_spell_in_previous_round = self.entity.is_controlled
 
 
 
@@ -496,10 +521,6 @@ class ActionMoveToMonstersCloseToMyBase(ActionBase):
 
 	def action_move_to_monster_close_to_my_base(self, action_info, monster):
 		self.move_to_monster(action_info, monster)
-
-
-	def get_monster_distance_to_my_base(self, monster):
-		return self.get_monster_distance_to_my_base(monster)
 
 
 
@@ -561,8 +582,12 @@ class ActionShieldSelf(ActionShield):
 		self.shield(action_info, self.hero_base.entity)
 
 
-	def get_is_not_controlled(self):
-		return not self.hero_base.entity.is_controlled
+	def get_was_not_targeted_by_spell(self):
+		return not self.hero_base.targeted_by_spell_in_previous_round
+
+
+	def get_hero_shielded(self):
+		return self.hero_base.entity.shield_life > 0
 
 
 
@@ -571,6 +596,18 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 		self.parent_my_heroes = parent_my_heroes
 
 		self.hero_base = HeroBase(self, entity, rendezvous)
+
+
+	def clear(self):
+		self.hero_base.clear()
+
+
+	def update(self, entity):
+		self.hero_base.update(entity)
+
+
+	def update_targeted_by_spell_in_previous_round(self):
+		self.hero_base.update_targeted_by_spell_in_previous_round()
 
 
 	def add_possible_actions(self):
@@ -627,7 +664,8 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 		return (
 			self.get_locked_penalty_weight(action, action_arguments) +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
-			self.get_is_not_controlled() * Utils.infinity
+			self.get_hero_shielded() * Utils.infinity +
+			self.get_was_not_targeted_by_spell() * Utils.infinity
 		)
 
 
@@ -711,6 +749,18 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 		self.hero_base = HeroBase(self, entity, rendezvous)
 
 
+	def clear(self):
+		self.hero_base.clear()
+
+
+	def update(self, entity):
+		self.hero_base.update(entity)
+
+
+	def update_targeted_by_spell_in_previous_round(self):
+		self.hero_base.update_targeted_by_spell_in_previous_round()
+
+
 	def add_possible_actions(self):
 		ActionWait(self, self.get_weight_action_wait)
 		ActionRendezvous(self, self.get_weight_action_rendezvous)
@@ -772,7 +822,8 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 		return (
 			self.get_locked_penalty_weight(action, action_arguments) +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
-			self.get_is_not_controlled() * Utils.infinity
+			self.get_hero_shielded() * Utils.infinity +
+			self.get_was_not_targeted_by_spell() * Utils.infinity
 		)
 
 
