@@ -5,7 +5,7 @@ from queue import PriorityQueue
 
 
 class Utils:
-	infinite = 424242
+	infinity = 424242
 
 	@staticmethod
 	def debug(*args, **kwargs):
@@ -257,7 +257,7 @@ class Entity:
 		self.shield_life = shield_life
 
 		# Equals 1 when this entity is under a control spell
-		# self.is_controlled = is_controlled
+		self.is_controlled = is_controlled
 
 		# Remaining health of this monster
 		# self.health = health
@@ -381,15 +381,15 @@ class ActionBase:
 
 
 	def get_weight_threat_for_my_base(self, monster):
-		return 0 if monster.entity.threat_for == monster.threat_for_my_base else Utils.infinite
+		return 0 if monster.entity.threat_for == monster.threat_for_my_base else Utils.infinity
 
 
 	def get_weight_threat_for_opponent_base(self, monster):
-		return 0 if monster.entity.threat_for == monster.threat_for_opponent_base else Utils.infinite
+		return 0 if monster.entity.threat_for == monster.threat_for_opponent_base else Utils.infinity
 
 
 	def get_weight_not_threat_for_opponent_base(self, monster):
-		return 0 if monster.entity.threat_for != monster.threat_for_opponent_base else Utils.infinite
+		return 0 if monster.entity.threat_for != monster.threat_for_opponent_base else Utils.infinity
 
 
 	def get_weight_enough_mana_for_cast(self):
@@ -397,7 +397,7 @@ class ActionBase:
 
 
 	def get_weight_mana_threshold_reached(self, mana_threshold):
-		return 0 if self.parent_my_heroes.parent_game.me.mana >= mana_threshold else Utils.infinite
+		return 0 if self.parent_my_heroes.parent_game.me.mana >= mana_threshold else Utils.infinity
 
 
 	def get_weight_hero_distance_to_my_base(self):
@@ -535,15 +535,53 @@ class ActionBlowAwayFromBase(ActionBase):
 
 
 	def get_weight_monster_in_wind_range(self, monster):
-		return 0 if self.get_weight_hero_distance_to_monster(monster) <= self.hero_base.wind_range else Utils.infinite
+		return 0 if self.get_weight_hero_distance_to_monster(monster) <= self.hero_base.wind_range else Utils.infinity
 
 
 	def get_weight_monster_close_to_my_base(self, monster):
-		return 0 if monster.distance_from_my_base <= 2500 else Utils.infinite
+		return 0 if monster.distance_from_my_base <= 2500 else Utils.infinity
 
 
 
-class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveToMonstersCloseToMyBase, ActionBlowAwayFromBase):
+class ActionShield(ActionBase):
+	def shield(self, action_info, entity):
+		self.print_shield(action_info, entity.id_)
+
+
+	def print_shield(self, action_info, id_):
+		print(f"SPELL SHIELD {id_} {action_info['label']} {action_info['weight']}")
+
+
+	def get_weight_monster_not_in_either_base_target_radius(self, monster):
+		return 0 if not self.get_weight_monster_in_my_base_target_radius(monster) and not self.get_weight_monster_in_opponent_base_target_radius(monster) else Utils.infinity
+
+
+	def get_weight_monster_in_my_base_target_radius(self, monster):
+		return 0 if self.get_monster_distance_to_my_base(monster) <= self.parent_my_heroes.parent_game.me.base_target_radius else Utils.infinity
+
+
+
+class ActionShieldSelf(ActionShield):
+	def __init__(self, parent_hero, get_weight_method):
+		self.parent_hero = parent_hero
+
+		self.add_shield_self(get_weight_method)
+
+
+	def add_shield_self(self, get_weight_method):
+		self.parent_hero.add_possible_action(self.parent_hero.get_action_info(ActionShieldSelf.action_shield_self, "shield self", get_weight_method))
+
+
+	def action_shield_self(self, action_info):
+		self.shield(action_info, self.hero_base.entity)
+
+
+	def get_weight_is_controlled(self):
+		return 0 if self.hero_base.entity.is_controlled else Utils.infinity
+
+
+
+class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveToMonstersCloseToMyBase, ActionBlowAwayFromBase, ActionShieldSelf):
 	def __init__(self, parent_my_heroes, entity, rendezvous):
 		self.parent_my_heroes = parent_my_heroes
 
@@ -556,11 +594,12 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 		ActionMoveToMonsters(self, self.get_weight_action_move_to_monster)
 		ActionMoveToMonstersCloseToMyBase(self, self.get_weight_action_move_to_monster_close_to_my_base)
 		ActionBlowAwayFromBase(self, self.get_weight_action_blow_monster_away_from_base)
+		ActionShieldSelf(self, self.get_weight_action_shield_self)
 
 
 	def get_weight_action_wait(self, action, action_arguments):
 		return (
-			Utils.infinite
+			Utils.infinity
 		)
 
 
@@ -599,6 +638,14 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 		)
 
 
+	def get_weight_action_shield_self(self, action, action_arguments):
+		return (
+			self.get_locked_penalty_weight(1, action, action_arguments) +
+			self.get_weight_enough_mana_for_cast() +
+			self.get_weight_is_controlled()
+		)
+
+
 
 class ActionControl(ActionBase):
 	def __init__(self, parent_hero, get_weight_method):
@@ -625,25 +672,7 @@ class ActionControl(ActionBase):
 
 
 	def get_weight_in_control_range(self, monster):
-		return 0 if self.get_weight_hero_distance_to_monster(monster) <= self.hero_base.control_range else Utils.infinite
-
-
-
-class ActionShield(ActionBase):
-	def shield(self, action_info, entity):
-		self.print_shield(action_info, entity.id_)
-
-
-	def print_shield(self, action_info, id_):
-		print(f"SPELL SHIELD {id_} {action_info['label']} {action_info['weight']}")
-
-
-	def get_weight_monster_not_in_either_base_target_radius(self, monster):
-		return 0 if not self.get_weight_monster_in_my_base_target_radius(monster) and not self.get_weight_monster_in_opponent_base_target_radius(monster) else Utils.infinite
-
-
-	def get_weight_monster_in_my_base_target_radius(self, monster):
-		return 0 if self.get_monster_distance_to_my_base(monster) <= self.parent_my_heroes.parent_game.me.base_target_radius else Utils.infinite
+		return 0 if self.get_weight_hero_distance_to_monster(monster) <= self.hero_base.control_range else Utils.infinity
 
 
 
@@ -664,15 +693,15 @@ class ActionShieldMonster(ActionShield):
 
 
 	def get_weight_in_shield_range(self, monster):
-		return 0 if self.get_weight_hero_distance_to_monster(monster) <= self.hero_base.shield_range else Utils.infinite
+		return 0 if self.get_weight_hero_distance_to_monster(monster) <= self.hero_base.shield_range else Utils.infinity
 
 
 	def get_weight_monster_not_shielded(self, monster):
-		return 0 if monster.entity.shield_life == 0 else Utils.infinite
+		return 0 if monster.entity.shield_life == 0 else Utils.infinity
 
 
 	def get_weight_monster_in_opponent_base_target_radius(self, monster):
-		return 0 if self.get_monster_distance_to_opponent_base(monster) <= self.parent_my_heroes.parent_game.opponent.base_target_radius else Utils.infinite
+		return 0 if self.get_monster_distance_to_opponent_base(monster) <= self.parent_my_heroes.parent_game.opponent.base_target_radius else Utils.infinity
 
 
 	def get_monster_distance_to_opponent_base(self, monster):
@@ -680,7 +709,7 @@ class ActionShieldMonster(ActionShield):
 
 
 
-class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionControl, ActionShieldMonster):
+class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionControl, ActionShieldMonster, ActionShieldSelf):
 	def __init__(self, parent_my_heroes, entity, rendezvous=3):
 		self.parent_my_heroes = parent_my_heroes
 
@@ -692,19 +721,21 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 		ActionRendezvous(self, self.get_weight_action_rendezvous)
 		ActionMoveToMonsters(self, self.get_weight_action_move_to_monster)
 		ActionControl(self, self.get_weight_action_control)
-		ActionShieldMonster(self, self.get_weight_action_shield)
+		ActionShieldMonster(self, self.get_weight_action_shield_monster)
+		ActionShieldSelf(self, self.get_weight_action_shield_self)
 
 
 	def get_weight_action_wait(self, action, action_arguments):
 		return (
-			Utils.infinite
+			Utils.infinity
 		)
 
 
 	def get_weight_action_rendezvous(self, action, action_arguments):
 		return (
 			self.get_weight_move_to_rendezvous() * 2 +
-			self.get_weight_mana_threshold_reached(100) * 0.5
+			self.get_weight_mana_threshold_reached(100) * 0.5 +
+			10000
 		)
 
 
@@ -728,7 +759,7 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 		)
 
 
-	def get_weight_action_shield(self, action, action_arguments):
+	def get_weight_action_shield_monster(self, action, action_arguments):
 		return (
 			self.get_locked_penalty_weight(1, action, action_arguments) +
 			self.get_weight_enough_mana_for_cast() +
@@ -737,6 +768,14 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 			self.get_weight_mana_threshold_reached(100) +
 			self.get_weight_monster_not_shielded(*action_arguments) +
 			self.get_weight_monster_in_opponent_base_target_radius(*action_arguments)
+		)
+
+
+	def get_weight_action_shield_self(self, action, action_arguments):
+		return (
+			self.get_locked_penalty_weight(1, action, action_arguments) +
+			self.get_weight_enough_mana_for_cast() +
+			self.get_weight_is_controlled()
 		)
 
 
