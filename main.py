@@ -404,6 +404,14 @@ class ActionBase:
 		return self.get_weight_monster_in_my_base_target_radius(monster) or self.get_monster_in_opponent_base_target_radius(monster)
 
 
+	def get_monster_in_opponent_base_target_radius(self, monster):
+		return self.get_monster_distance_to_opponent_base(monster) <= self.parent_my_heroes.parent_game.opponent.base_target_radius
+
+
+	def get_monster_not_in_opponent_base_target_radius(self, monster):
+		return not self.get_monster_in_opponent_base_target_radius(monster)
+
+
 	def get_weight_monster_in_my_base_target_radius(self, monster):
 		return self.get_monster_distance_to_my_base(monster) <= self.parent_my_heroes.parent_game.me.base_target_radius
 
@@ -694,8 +702,8 @@ class ActionControl(ActionBase):
 		print(f"SPELL CONTROL {id_} {x} {y} {action_info['label']} {action_info['weight']}")
 
 
-	def get_in_control_range(self, monster):
-		return 0 if self.get_hero_to_monster_distance(monster) <= self.hero_base.control_range else Utils.infinity
+	def get_not_in_control_range(self, monster):
+		return self.get_hero_to_monster_distance(monster) > self.hero_base.control_range
 
 
 
@@ -715,16 +723,12 @@ class ActionShieldMonster(ActionShield):
 		self.shield(action_info, monster.entity)
 
 
-	def get_in_shield_range(self, monster):
-		return 0 if self.get_hero_to_monster_distance(monster) <= self.hero_base.shield_range else Utils.infinity
+	def get_not_in_shield_range(self, monster):
+		return self.get_hero_to_monster_distance(monster) > self.hero_base.shield_range
 
 
-	def get_monster_not_shielded(self, monster):
-		return 0 if monster.entity.shield_life == 0 else Utils.infinity
-
-
-	def get_monster_in_opponent_base_target_radius(self, monster):
-		return 0 if self.get_monster_distance_to_opponent_base(monster) <= self.parent_my_heroes.parent_game.opponent.base_target_radius else Utils.infinity
+	def get_monster_shielded(self, monster):
+		return monster.entity.shield_life == 0
 
 
 	def get_monster_distance_to_opponent_base(self, monster):
@@ -797,10 +801,10 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 		return (
 			self.get_locked_penalty_weight(action, action_arguments) +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
-			self.get_in_control_range(*action_arguments) +
+			self.get_not_in_control_range(*action_arguments) * Utils.infinity +
 			self.get_threat_for_opponent_base(*action_arguments) * Utils.infinity +
 			self.get_mana_threshold_not_reached(100) * Utils.infinity +
-			self.get_monster_not_shielded(*action_arguments) +
+			self.get_monster_shielded(*action_arguments) * Utils.infinity +
 			self.get_monster_in_either_base_target_radius(*action_arguments) * Utils.infinity
 		)
 
@@ -809,11 +813,11 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 		return (
 			self.get_locked_penalty_weight(action, action_arguments) +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
-			self.get_in_shield_range(*action_arguments) +
+			self.get_not_in_shield_range(*action_arguments) * Utils.infinity +
 			self.get_not_threat_for_opponent_base(*action_arguments) * Utils.infinity +
 			self.get_mana_threshold_not_reached(100) * Utils.infinity +
-			self.get_monster_not_shielded(*action_arguments) +
-			self.get_monster_in_opponent_base_target_radius(*action_arguments) +
+			self.get_monster_shielded(*action_arguments) * Utils.infinity +
+			self.get_monster_not_in_opponent_base_target_radius(*action_arguments) +
 			self.get_not_threshold_monster_count_in_radius_around_point(5, self.parent_my_heroes.parent_game.opponent.base_target_radius, self.parent_my_heroes.parent_game.opponent) * Utils.infinity
 		)
 
