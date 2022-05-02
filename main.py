@@ -347,7 +347,7 @@ class ActionBase:
 		self.print_move(action_info, monster.entity.x, monster.entity.y)
 
 
-	def get_locked_penalty_weight(self, action, action_arguments):
+	def get_locked_count(self, action, action_arguments):
 		total_penalty_weight = 0
 
 		for other_my_hero in self.parent_my_heroes.my_heroes:
@@ -355,7 +355,7 @@ class ActionBase:
 				continue
 
 			if self.action_already_locked(other_my_hero, action, action_arguments):
-				total_penalty_weight += self.hero_base.penalty_weight
+				total_penalty_weight += 1
 
 		return total_penalty_weight
 
@@ -488,8 +488,6 @@ class HeroBase:
 		self.entity = entity
 
 		self.rendezvous = rendezvous
-
-		self.penalty_weight = 10000
 
 		self.wind_range = 1280
 
@@ -642,7 +640,7 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 
 	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
+			self.get_locked_count(action, action_arguments) * 10000 +
 			self.get_hero_to_monster_distance(*action_arguments) * 3 +
 			self.get_hero_distance_to_my_base() * 3 +
 			self.get_not_threat_for_my_base(*action_arguments) * 2000
@@ -651,7 +649,7 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 
 	def get_weight_action_move_to_monster_close_to_my_base(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
+			self.get_locked_count(action, action_arguments) * 10000 +
 			self.get_hero_to_monster_distance(*action_arguments) +
 			self.get_not_threat_for_my_base(*action_arguments) * Utils.infinity +
 			self.get_monster_distance_to_my_base(*action_arguments)
@@ -660,7 +658,7 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 
 	def get_weight_action_blow_monster_away_from_base(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
+			self.get_locked_count(action, action_arguments) * Utils.infinity +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
 			self.get_not_threat_for_my_base(*action_arguments) * Utils.infinity +
 			self.get_monster_in_wind_range(*action_arguments) * Utils.infinity +
@@ -670,7 +668,6 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 
 	def get_weight_action_shield_self(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
 			self.get_hero_shielded() * Utils.infinity +
 			self.get_was_not_targeted_by_spell() * Utils.infinity
@@ -790,7 +787,7 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 
 	def get_weight_action_move_to_monster(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
+			self.get_locked_count(action, action_arguments) * 10000 +
 			self.get_hero_to_monster_distance(*action_arguments) * 3 +
 			self.get_hero_distance_to_opponent_base() +
 			self.get_threat_for_opponent_base(*action_arguments) * Utils.infinity
@@ -799,7 +796,7 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 
 	def get_weight_action_control(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
+			self.get_locked_count(action, action_arguments) * Utils.infinity +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
 			self.get_not_in_control_range(*action_arguments) * Utils.infinity +
 			self.get_threat_for_opponent_base(*action_arguments) * Utils.infinity +
@@ -811,7 +808,7 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 
 	def get_weight_action_shield_monster(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
+			self.get_locked_count(action, action_arguments) * Utils.infinity +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
 			self.get_not_in_shield_range(*action_arguments) * Utils.infinity +
 			self.get_not_threat_for_opponent_base(*action_arguments) * Utils.infinity +
@@ -824,7 +821,6 @@ class HeroAttacker(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionCon
 
 	def get_weight_action_shield_self(self, action, action_arguments):
 		return (
-			self.get_locked_penalty_weight(action, action_arguments) +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
 			self.get_hero_shielded() * Utils.infinity +
 			self.get_was_not_targeted_by_spell() * Utils.infinity
