@@ -420,6 +420,10 @@ class ActionBase:
 		return monster.distance_from_my_base
 
 
+	def get_monster_shielded(self, monster):
+		return monster.entity.shield_life > 0
+
+
 class ActionWait(ActionBase):
 	def __init__(self, parent_hero, get_weight_method):
 		self.parent_hero = parent_hero
@@ -554,13 +558,12 @@ class ActionBlowAwayFromBase(ActionBase):
 		print(f"SPELL WIND {x} {y} {action_info['label']} {action_info['weight']}")
 
 
-	def get_monster_in_wind_range(self, monster):
-		return self.get_hero_to_monster_distance(monster) <= self.hero_base.wind_range
+	def get_monster_not_in_wind_range(self, monster):
+		return self.get_hero_to_monster_distance(monster) > self.hero_base.wind_range
 
 
 	def get_monster_not_almost_at_my_base(self, monster):
 		return monster.distance_from_my_base > 2500
-
 
 
 class ActionShield(ActionBase):
@@ -661,8 +664,9 @@ class HeroFarmer(ActionWait, ActionRendezvous, ActionMoveToMonsters, ActionMoveT
 			self.get_locked_count(action, action_arguments) * Utils.infinity +
 			self.get_not_enough_mana_for_cast() * Utils.infinity +
 			self.get_not_threat_for_my_base(*action_arguments) * Utils.infinity +
-			self.get_monster_in_wind_range(*action_arguments) * Utils.infinity +
-			self.get_monster_not_almost_at_my_base(*action_arguments) * Utils.infinity
+			self.get_monster_not_in_wind_range(*action_arguments) * Utils.infinity +
+			self.get_monster_not_almost_at_my_base(*action_arguments) * Utils.infinity +
+			self.get_monster_shielded(*action_arguments) * Utils.infinity
 		)
 
 
@@ -722,10 +726,6 @@ class ActionShieldMonster(ActionShield):
 
 	def get_not_in_shield_range(self, monster):
 		return self.get_hero_to_monster_distance(monster) > self.hero_base.shield_range
-
-
-	def get_monster_shielded(self, monster):
-		return monster.entity.shield_life == 0
 
 
 	def get_monster_distance_to_opponent_base(self, monster):
